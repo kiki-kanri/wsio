@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/*",
+]
+
+[workspace.package]
+authors = ["kiki-kanri"]
+edition = "2024"
+homepage = "https://github.com/kiki-kanri/rtio"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/kiki-kanri/rtio"
