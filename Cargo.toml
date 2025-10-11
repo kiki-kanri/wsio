@@ -7,7 +7,7 @@ members = [
 [workspace.package]
 authors = ["kiki-kanri"]
 edition = "2024"
-homepage = "https://github.com/kiki-kanri/rtio"
+homepage = "https://github.com/kiki-kanri/wsio"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/kiki-kanri/rtio"
+repository = "https://github.com/kiki-kanri/wsio"

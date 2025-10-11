@@ -1,5 +1,5 @@
 [package]
-name = "rtio-server"
+name = "wsio-server"
 version = "0.1.0"
 
 authors.workspace = true
