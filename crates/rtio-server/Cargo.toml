@@ -10,6 +10,7 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+tower-layer = "0.3.3"
 
 [features]
 all = []
