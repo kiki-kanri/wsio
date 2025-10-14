@@ -16,7 +16,7 @@ impl WsIoLayer {
     }
 }
 
-impl<S: Clone> Layer<S> for WsIoLayer {
+impl<S> Layer<S> for WsIoLayer {
     type Service = WsIoService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
