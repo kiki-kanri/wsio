@@ -45,9 +45,12 @@ where
 
     #[inline(always)]
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        let path = "/ws.io";
-        if request.uri().path().starts_with(path) {
-            println!("Intercepted ws.io request: {path}");
+        if request
+            .uri()
+            .path()
+            .starts_with(self.runtime.config.request_path.as_ref())
+        {
+            println!("Intercepted ws.io request");
         }
 
         self.inner.call(request)
