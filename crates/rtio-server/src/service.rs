@@ -25,10 +25,6 @@ impl<S> WsIoService<S> {
     pub fn new(inner: S, runtime: WsIoRuntime) -> Self {
         Self { inner, runtime }
     }
-
-    pub fn runtime(&self) -> &WsIoRuntime {
-        &self.runtime
-    }
 }
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for WsIoService<S>
