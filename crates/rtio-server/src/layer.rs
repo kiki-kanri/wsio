@@ -11,7 +11,7 @@ pub struct WsIoLayer {
 }
 
 impl WsIoLayer {
-    pub fn new(runtime: WsIoRuntime) -> Self {
+    pub(crate) fn new(runtime: WsIoRuntime) -> Self {
         Self { runtime }
     }
 }

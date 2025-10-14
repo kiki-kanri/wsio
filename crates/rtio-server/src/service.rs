@@ -22,7 +22,7 @@ pub struct WsIoService<S> {
 }
 
 impl<S> WsIoService<S> {
-    pub fn new(inner: S, runtime: WsIoRuntime) -> Self {
+    pub(crate) fn new(inner: S, runtime: WsIoRuntime) -> Self {
         Self { inner, runtime }
     }
 }

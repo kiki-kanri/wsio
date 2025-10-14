@@ -4,6 +4,7 @@ use crate::{
     WsIo,
     config::WsIoConfig,
     layer::WsIoLayer,
+    packet::codecs::WsIoPacketCodec,
     runtime::WsIoRuntime,
 };
 
@@ -12,7 +13,7 @@ pub struct WsIoBuilder {
 }
 
 impl WsIoBuilder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         WsIoBuilder {
             config: WsIoConfig::default(),
         }
@@ -21,6 +22,11 @@ impl WsIoBuilder {
     pub fn build_layer(&self) -> (WsIoLayer, WsIo) {
         let runtime = WsIoRuntime::new(self.config.clone());
         (WsIoLayer::new(runtime.clone()), WsIo(runtime))
+    }
+
+    pub fn default_packet_codec(mut self, codec: WsIoPacketCodec) -> Self {
+        self.config.default_codec = codec;
+        self
     }
 
     pub fn request_path(mut self, request_path: impl Into<Cow<'static, str>>) -> Self {
