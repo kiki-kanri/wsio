@@ -1,26 +1,25 @@
 use tower_layer::Layer;
 
-use super::{
-    inner::InnerWsIo,
+use crate::{
+    runtime::WsIoRuntime,
     service::WsIoService,
 };
 
+#[derive(Clone, Debug)]
 pub struct WsIoLayer {
-    inner: InnerWsIo,
+    runtime: WsIoRuntime,
 }
 
 impl WsIoLayer {
-    pub fn new() -> Self {
-        WsIoLayer {
-            inner: InnerWsIo::new(),
-        }
+    pub fn new(runtime: WsIoRuntime) -> Self {
+        Self { runtime }
     }
 }
 
-impl<S> Layer<S> for WsIoLayer {
+impl<S: Clone> Layer<S> for WsIoLayer {
     type Service = WsIoService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        WsIoService::with_client(inner)
+        WsIoService::new(inner, self.runtime.clone())
     }
 }

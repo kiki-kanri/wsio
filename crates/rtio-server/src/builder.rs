@@ -1,7 +1,7 @@
-use super::{
+use crate::{
     WsIo,
-    inner::InnerWsIo,
     layer::WsIoLayer,
+    runtime::WsIoRuntime,
 };
 
 pub struct WsIoBuilder {}
@@ -12,6 +12,7 @@ impl WsIoBuilder {
     }
 
     pub fn build_layer(&self) -> (WsIoLayer, WsIo) {
-        (WsIoLayer::new(), WsIo(InnerWsIo::new()))
+        let runtime = WsIoRuntime::new();
+        (WsIoLayer::new(runtime.clone()), WsIo(runtime))
     }
 }

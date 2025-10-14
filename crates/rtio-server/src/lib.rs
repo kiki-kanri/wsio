@@ -1,14 +1,14 @@
 mod builder;
-mod inner;
 mod layer;
 mod namespace;
-mod service;
+mod runtime;
+pub mod service;
 
 use builder::WsIoBuilder;
-use inner::InnerWsIo;
+use runtime::WsIoRuntime;
 
 #[derive(Clone, Debug)]
-pub struct WsIo(InnerWsIo);
+pub struct WsIo(WsIoRuntime);
 
 impl WsIo {
     pub fn builder() -> WsIoBuilder {
