@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{
     Result,
     bail,
@@ -9,10 +11,10 @@ use crate::{
     namespace::WsIoNamespace,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct WsIoRuntime {
     pub(crate) config: WsIoConfig,
-    namespaces: DashMap<String, WsIoNamespace>,
+    namespaces: DashMap<String, Arc<WsIoNamespace>>,
 }
 
 impl WsIoRuntime {
@@ -23,19 +25,19 @@ impl WsIoRuntime {
         }
     }
 
-    pub(crate) fn add_namespace(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
+    pub(crate) fn add_namespace(self: &Arc<Self>, path: impl AsRef<str>) -> Result<Arc<WsIoNamespace>> {
         let path = path.as_ref();
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
         }
 
-        let namespace = WsIoNamespace::new(path.as_ref(), self.clone());
+        let namespace = Arc::new(WsIoNamespace::new(path.as_ref(), self.clone()));
         self.namespaces.insert(path.to_string(), namespace.clone());
         Ok(namespace)
     }
 
     #[inline]
-    pub fn get_namespace(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
+    pub fn get_namespace(&self, path: impl AsRef<str>) -> Option<Arc<WsIoNamespace>> {
         self.namespaces.get(path.as_ref()).map(|v| v.clone())
     }
 }

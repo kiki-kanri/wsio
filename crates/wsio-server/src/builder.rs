@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     WsIo,
     config::WsIoConfig,
@@ -18,7 +20,7 @@ impl WsIoBuilder {
     }
 
     pub fn build_layer(&self) -> (WsIoLayer, WsIo) {
-        let runtime = WsIoRuntime::new(self.config.clone());
+        let runtime = Arc::new(WsIoRuntime::new(self.config.clone()));
         (WsIoLayer::new(runtime.clone()), WsIo(runtime))
     }
 

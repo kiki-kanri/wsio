@@ -13,7 +13,6 @@ use serde::{
 
 use super::super::WsIoPacket;
 
-#[derive(Clone, Debug)]
 pub(super) struct WsIoPacketBincodeCodec;
 
 impl WsIoPacketBincodeCodec {

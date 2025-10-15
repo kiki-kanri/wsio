@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 
 mod builder;
@@ -13,7 +15,7 @@ use namespace::WsIoNamespace;
 use runtime::WsIoRuntime;
 
 #[derive(Clone, Debug)]
-pub struct WsIo(WsIoRuntime);
+pub struct WsIo(Arc<WsIoRuntime>);
 
 impl WsIo {
     pub fn builder() -> WsIoBuilder {
@@ -21,12 +23,12 @@ impl WsIo {
     }
 
     #[inline]
-    pub fn of(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
+    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoNamespace>> {
         self.0.get_namespace(path)
     }
 
     #[inline]
-    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
+    pub fn ns(&self, path: impl AsRef<str>) -> Result<Arc<WsIoNamespace>> {
         Ok(self.0.add_namespace(path)?)
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tower_layer::Layer;
 
 use crate::{
@@ -7,11 +9,11 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct WsIoLayer {
-    runtime: WsIoRuntime,
+    runtime: Arc<WsIoRuntime>,
 }
 
 impl WsIoLayer {
-    pub(crate) fn new(runtime: WsIoRuntime) -> Self {
+    pub(crate) fn new(runtime: Arc<WsIoRuntime>) -> Self {
         Self { runtime }
     }
 }
