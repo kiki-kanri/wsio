@@ -1,4 +1,4 @@
-pub(crate) struct WsIoContext {
+pub struct WsIoContext {
     authorized: bool,
     id: String,
 }
