@@ -7,7 +7,7 @@ members = [
 [workspace.package]
 authors = ["kiki-kanri"]
 edition = "2024"
-homepage = "https://github.com/kiki-kanri/wsio"
+homepage = "https://github.com/kiki-kanri/wsioxide"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/kiki-kanri/wsio"
+repository = "https://github.com/kiki-kanri/wsioxide"
