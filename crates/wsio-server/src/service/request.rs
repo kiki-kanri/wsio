@@ -9,6 +9,7 @@ use http::{
     header,
 };
 use hyper::upgrade::OnUpgrade;
+use tokio::spawn;
 use tungstenite::handshake::derive_accept_key;
 use url::form_urlencoded;
 
@@ -46,7 +47,7 @@ pub async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     }
 
     // Get websocket sec key
-    let Some(websocket_sec_key) = get_header_value(&request, header::SEC_WEBSOCKET_KEY) else {
+    let Some(ws_sec_key) = get_header_value(&request, header::SEC_WEBSOCKET_KEY) else {
         return respond(StatusCode::BAD_REQUEST);
     };
 
@@ -65,7 +66,7 @@ pub async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     };
 
     // Generate accept key
-    let websocket_accept_key = derive_accept_key(websocket_sec_key.as_bytes());
+    let ws_accept_key = derive_accept_key(ws_sec_key.as_bytes());
 
     // Upgrade
     let on_upgrade = match request.extensions_mut().remove::<OnUpgrade>() {
@@ -73,10 +74,17 @@ pub async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         None => return respond(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
+    spawn(async move {
+        match on_upgrade.await {
+            Ok(upgraded) => namespace.handle_upgraded_ws(upgraded).await,
+            Err(e) => {}
+        }
+    });
+
     Ok(Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)
         .header(header::CONNECTION, "Upgrade")
-        .header(header::SEC_WEBSOCKET_ACCEPT, websocket_accept_key)
+        .header(header::SEC_WEBSOCKET_ACCEPT, ws_accept_key)
         .header(header::UPGRADE, "websocket")
         .body(ResBody::default())
         .unwrap())
