@@ -22,7 +22,7 @@ fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, exp
         .unwrap_or(false)
 }
 
-pub async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
+pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     mut request: Request<ReqBody>,
     runtime: Arc<WsIoRuntime>,
 ) -> Result<Response<ResBody>, E> {

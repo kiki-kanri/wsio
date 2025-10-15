@@ -19,18 +19,19 @@ impl WsIoBuilder {
         }
     }
 
+    // Public methods
     pub fn build_layer(&self) -> (WsIoLayer, WsIo) {
         let runtime = Arc::new(WsIoRuntime::new(self.config.clone()));
         (WsIoLayer::new(runtime.clone()), WsIo(runtime))
     }
 
-    pub fn default_packet_codec(mut self, codec: WsIoPacketCodec) -> Self {
-        self.config.default_codec = codec;
+    pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
+        self.config.request_path = request_path.as_ref().into();
         self
     }
 
-    pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
-        self.config.request_path = request_path.as_ref().into();
+    pub fn with_default_packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
+        self.config.default_packet_codec = packet_codec;
         self
     }
 }

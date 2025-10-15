@@ -11,7 +11,10 @@ mod runtime;
 mod service;
 
 use builder::WsIoBuilder;
-use namespace::WsIoNamespace;
+use namespace::{
+    WsIoNamespace,
+    builder::WsIoNamespaceBuilder,
+};
 use runtime::WsIoRuntime;
 
 #[derive(Clone, Debug)]
@@ -28,7 +31,7 @@ impl WsIo {
     }
 
     #[inline]
-    pub fn ns(&self, path: impl AsRef<str>) -> Result<Arc<WsIoNamespace>> {
-        Ok(self.0.add_namespace(path)?)
+    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespaceBuilder> {
+        self.0.new_namespace_builder(path)
     }
 }

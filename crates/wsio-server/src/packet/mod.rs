@@ -6,7 +6,7 @@ use serde::{
 pub mod codecs;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-enum WsIoPacketType {
+pub enum WsIoPacketType {
     #[serde(rename = "0")]
     Auth,
 
@@ -15,7 +15,7 @@ enum WsIoPacketType {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct WsIoPacket<D> {
+pub struct WsIoPacket<D> {
     #[serde(rename = "k")]
     key: String,
 

@@ -8,7 +8,10 @@ use dashmap::DashMap;
 
 use crate::{
     config::WsIoConfig,
-    namespace::WsIoNamespace,
+    namespace::{
+        WsIoNamespace,
+        builder::WsIoNamespaceBuilder,
+    },
 };
 
 #[derive(Debug)]
@@ -25,19 +28,30 @@ impl WsIoRuntime {
         }
     }
 
-    pub(crate) fn add_namespace(self: &Arc<Self>, path: impl AsRef<str>) -> Result<Arc<WsIoNamespace>> {
+    // Protected methods
+
+    #[inline]
+    pub(crate) fn get_namespace(&self, path: impl AsRef<str>) -> Option<Arc<WsIoNamespace>> {
+        self.namespaces.get(path.as_ref()).map(|v| v.clone())
+    }
+
+    #[inline]
+    pub(crate) fn insert_namespace(&self, namespace: Arc<WsIoNamespace>) -> Result<()> {
+        if self.namespaces.contains_key(namespace.path()) {
+            bail!("Namespace {} already exists", namespace.path());
+        }
+
+        self.namespaces.insert(namespace.path().into(), namespace);
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: impl AsRef<str>) -> Result<WsIoNamespaceBuilder> {
         let path = path.as_ref();
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
         }
 
-        let namespace = Arc::new(WsIoNamespace::new(path.as_ref(), self.clone()));
-        self.namespaces.insert(path.to_string(), namespace.clone());
-        Ok(namespace)
-    }
-
-    #[inline]
-    pub fn get_namespace(&self, path: impl AsRef<str>) -> Option<Arc<WsIoNamespace>> {
-        self.namespaces.get(path.as_ref()).map(|v| v.clone())
+        Ok(WsIoNamespaceBuilder::new(path, self.clone()))
     }
 }
