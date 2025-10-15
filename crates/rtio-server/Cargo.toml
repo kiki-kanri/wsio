@@ -21,6 +21,7 @@ serde_json = { version = "1.0.145", optional = true }
 sonic-rs = { version = "0.5.5", optional = true }
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
+url = "2.5.7"
 
 [dev-dependencies]
 axum = "0.8.6"

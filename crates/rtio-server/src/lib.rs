@@ -21,7 +21,12 @@ impl WsIo {
     }
 
     #[inline]
+    pub fn of(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
+        self.0.get_namespace(path)
+    }
+
+    #[inline]
     pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
-        Ok(self.0.add_ns(path)?)
+        Ok(self.0.add_namespace(path)?)
     }
 }

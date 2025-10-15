@@ -23,7 +23,7 @@ impl WsIoRuntime {
         }
     }
 
-    pub(crate) fn add_ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
+    pub(crate) fn add_namespace(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
         let path = path.as_ref();
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
@@ -34,7 +34,8 @@ impl WsIoRuntime {
         Ok(namespace)
     }
 
-    pub fn of(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
+    #[inline]
+    pub fn get_namespace(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
         self.namespaces.get(path.as_ref()).map(|v| v.clone())
     }
 }
