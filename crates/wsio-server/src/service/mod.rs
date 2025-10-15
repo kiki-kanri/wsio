@@ -22,7 +22,7 @@ use request::dispatch_request;
 
 use crate::runtime::WsIoRuntime;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsIoService<S> {
     inner: S,
     runtime: Arc<WsIoRuntime>,

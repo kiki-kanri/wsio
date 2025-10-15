@@ -14,7 +14,7 @@ use config::WsIoNamespaceConfig;
 
 use crate::runtime::WsIoRuntime;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsIoNamespace {
     runtime: Arc<WsIoRuntime>,
     config: WsIoNamespaceConfig,

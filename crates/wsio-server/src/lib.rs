@@ -4,6 +4,7 @@ use anyhow::Result;
 
 mod builder;
 mod config;
+mod context;
 mod layer;
 mod namespace;
 pub mod packet;
@@ -17,7 +18,7 @@ use namespace::{
 };
 use runtime::WsIoRuntime;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WsIo(Arc<WsIoRuntime>);
 
 impl WsIo {

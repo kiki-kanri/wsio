@@ -14,7 +14,6 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
 pub(crate) struct WsIoRuntime {
     pub(crate) config: WsIoConfig,
     namespaces: DashMap<String, Arc<WsIoNamespace>>,

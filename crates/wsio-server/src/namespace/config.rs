@@ -1,7 +1,20 @@
-use crate::packet::codecs::WsIoPacketCodec;
+use std::{
+    pin::Pin,
+    sync::Arc,
+};
 
-#[derive(Clone, Debug)]
+use anyhow::Result;
+
+use crate::{
+    context::WsIoContext,
+    packet::codecs::WsIoPacketCodec,
+};
+
+type AuthHandlerFn = Arc<dyn Fn(&WsIoContext) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+
+#[derive(Clone)]
 pub(super) struct WsIoNamespaceConfig {
-    pub(super) path: String,
+    pub(super) auth_handler_fn: Option<AuthHandlerFn>,
     pub(super) packet_codec: WsIoPacketCodec,
+    pub(super) path: String,
 }
