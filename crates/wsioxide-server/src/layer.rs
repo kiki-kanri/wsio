@@ -3,25 +3,25 @@ use std::sync::Arc;
 use tower_layer::Layer;
 
 use crate::{
-    runtime::WsIoRuntime,
-    service::WsIoService,
+    runtime::WsIoServerRuntime,
+    service::WsIoServerService,
 };
 
 #[derive(Clone)]
-pub struct WsIoLayer {
-    runtime: Arc<WsIoRuntime>,
+pub struct WsIoServerLayer {
+    runtime: Arc<WsIoServerRuntime>,
 }
 
-impl WsIoLayer {
-    pub(crate) fn new(runtime: Arc<WsIoRuntime>) -> Self {
+impl WsIoServerLayer {
+    pub(crate) fn new(runtime: Arc<WsIoServerRuntime>) -> Self {
         Self { runtime }
     }
 }
 
-impl<S> Layer<S> for WsIoLayer {
-    type Service = WsIoService<S>;
+impl<S> Layer<S> for WsIoServerLayer {
+    type Service = WsIoServerService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        WsIoService::new(inner, self.runtime.clone())
+        WsIoServerService::new(inner, self.runtime.clone())
     }
 }

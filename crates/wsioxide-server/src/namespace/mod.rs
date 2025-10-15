@@ -9,25 +9,25 @@ use tungstenite::protocol::Role;
 pub(crate) mod builder;
 mod config;
 
-use builder::WsIoNamespaceBuilder;
-use config::WsIoNamespaceConfig;
+use builder::WsIoServerNamespaceBuilder;
+use config::WsIoServerNamespaceConfig;
 
-use crate::runtime::WsIoRuntime;
+use crate::runtime::WsIoServerRuntime;
 
 #[derive(Clone)]
-pub struct WsIoNamespace {
-    runtime: Arc<WsIoRuntime>,
-    config: WsIoNamespaceConfig,
+pub struct WsIoServerNamespace {
+    runtime: Arc<WsIoServerRuntime>,
+    config: WsIoServerNamespaceConfig,
 }
 
-impl WsIoNamespace {
-    fn new(config: WsIoNamespaceConfig, runtime: Arc<WsIoRuntime>) -> Self {
+impl WsIoServerNamespace {
+    fn new(config: WsIoServerNamespaceConfig, runtime: Arc<WsIoServerRuntime>) -> Self {
         Self { config, runtime }
     }
 
     // Protected methods
-    pub(crate) fn builder(path: impl AsRef<str>, runtime: Arc<WsIoRuntime>) -> WsIoNamespaceBuilder {
-        WsIoNamespaceBuilder::new(path.as_ref(), runtime)
+    pub(crate) fn builder(path: impl AsRef<str>, runtime: Arc<WsIoServerRuntime>) -> WsIoServerNamespaceBuilder {
+        WsIoServerNamespaceBuilder::new(path.as_ref(), runtime)
     }
 
     pub(crate) async fn handle_upgraded_ws(&self, upgraded_ws: Upgraded) {

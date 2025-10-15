@@ -1,50 +1,50 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use wsioxide_core::packet::codecs::WsIoPacketCodec;
 
 use super::{
-    WsIoNamespace,
-    config::WsIoNamespaceConfig,
+    WsIoServerNamespace,
+    config::WsIoServerNamespaceConfig,
 };
 use crate::{
-    context::WsIoContext,
-    packet::codecs::WsIoPacketCodec,
-    runtime::WsIoRuntime,
+    context::WsIoServerContext,
+    runtime::WsIoServerRuntime,
 };
 
-pub struct WsIoNamespaceBuilder {
-    runtime: Arc<WsIoRuntime>,
-    config: WsIoNamespaceConfig,
+pub struct WsIoServerNamespaceBuilder {
+    runtime: Arc<WsIoServerRuntime>,
+    config: WsIoServerNamespaceConfig,
 }
 
-impl WsIoNamespaceBuilder {
-    pub(crate) fn new(path: &str, runtime: Arc<WsIoRuntime>) -> Self {
-        let config = WsIoNamespaceConfig {
+impl WsIoServerNamespaceBuilder {
+    pub(crate) fn new(path: &str, runtime: Arc<WsIoServerRuntime>) -> Self {
+        let config = WsIoServerNamespaceConfig {
             auth_handler_fn: None,
             packet_codec: runtime.config.default_packet_codec.clone(),
             path: path.into(),
         };
 
-        WsIoNamespaceBuilder { config, runtime }
+        WsIoServerNamespaceBuilder { config, runtime }
     }
 
     // Public methods
-    pub fn build(self) -> Result<Arc<WsIoNamespace>> {
-        let namespace = Arc::new(WsIoNamespace::new(self.config, self.runtime.clone()));
+    pub fn build(self) -> Result<Arc<WsIoServerNamespace>> {
+        let namespace = Arc::new(WsIoServerNamespace::new(self.config, self.runtime.clone()));
         self.runtime.insert_namespace(namespace.clone())?;
         Ok(namespace)
     }
 
     pub fn with_auth<F, Fut>(mut self, handler: F) -> Self
     where
-        F: Fn(&WsIoContext) -> Fut + Send + Sync + 'static,
+        F: Fn(&WsIoServerContext) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.config.auth_handler_fn = Some(Arc::new(move |ctx| Box::pin(handler(ctx))));
         self
     }
 
-    pub fn with_packet_codec(mut self, packet_codec: WsIoPacketCodec) -> WsIoNamespaceBuilder {
+    pub fn with_packet_codec(mut self, packet_codec: WsIoPacketCodec) -> WsIoServerNamespaceBuilder {
         self.config.packet_codec = packet_codec;
         self
     }

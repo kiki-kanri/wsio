@@ -20,21 +20,21 @@ mod request;
 
 use request::dispatch_request;
 
-use crate::runtime::WsIoRuntime;
+use crate::runtime::WsIoServerRuntime;
 
 #[derive(Clone)]
-pub struct WsIoService<S> {
+pub struct WsIoServerService<S> {
     inner: S,
-    runtime: Arc<WsIoRuntime>,
+    runtime: Arc<WsIoServerRuntime>,
 }
 
-impl<S> WsIoService<S> {
-    pub(crate) fn new(inner: S, runtime: Arc<WsIoRuntime>) -> Self {
+impl<S> WsIoServerService<S> {
+    pub(crate) fn new(inner: S, runtime: Arc<WsIoServerRuntime>) -> Self {
         Self { inner, runtime }
     }
 }
 
-impl<S, ReqBody, ResBody> TowerService<Request<ReqBody>> for WsIoService<S>
+impl<S, ReqBody, ResBody> TowerService<Request<ReqBody>> for WsIoServerService<S>
 where
     ReqBody: Body + Default + FmtDebug + Send + Unpin + 'static,
     ReqBody::Data: Send,

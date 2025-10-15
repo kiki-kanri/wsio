@@ -1,38 +1,38 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+pub use wsioxide_core as core;
 
 mod builder;
 mod config;
 mod context;
 mod layer;
 mod namespace;
-pub mod packet;
 mod runtime;
 mod service;
 
-use builder::WsIoBuilder;
+use builder::WsIoServerBuilder;
 use namespace::{
-    WsIoNamespace,
-    builder::WsIoNamespaceBuilder,
+    WsIoServerNamespace,
+    builder::WsIoServerNamespaceBuilder,
 };
-use runtime::WsIoRuntime;
+use runtime::WsIoServerRuntime;
 
 #[derive(Clone)]
-pub struct WsIo(Arc<WsIoRuntime>);
+pub struct WsIoServer(Arc<WsIoServerRuntime>);
 
-impl WsIo {
-    pub fn builder() -> WsIoBuilder {
-        WsIoBuilder::new()
+impl WsIoServer {
+    pub fn builder() -> WsIoServerBuilder {
+        WsIoServerBuilder::new()
     }
 
     #[inline]
-    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoNamespace>> {
+    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
         self.0.get_namespace(path)
     }
 
     #[inline]
-    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespaceBuilder> {
+    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
         self.0.new_namespace_builder(path)
     }
 }

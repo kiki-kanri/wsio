@@ -1,28 +1,29 @@
 use std::sync::Arc;
 
+use wsioxide_core::packet::codecs::WsIoPacketCodec;
+
 use crate::{
-    WsIo,
-    config::WsIoConfig,
-    layer::WsIoLayer,
-    packet::codecs::WsIoPacketCodec,
-    runtime::WsIoRuntime,
+    WsIoServer,
+    config::WsIoServerConfig,
+    layer::WsIoServerLayer,
+    runtime::WsIoServerRuntime,
 };
 
-pub struct WsIoBuilder {
-    config: WsIoConfig,
+pub struct WsIoServerBuilder {
+    config: WsIoServerConfig,
 }
 
-impl WsIoBuilder {
+impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
-        WsIoBuilder {
-            config: WsIoConfig::default(),
+        WsIoServerBuilder {
+            config: WsIoServerConfig::default(),
         }
     }
 
     // Public methods
-    pub fn build_layer(&self) -> (WsIoLayer, WsIo) {
-        let runtime = Arc::new(WsIoRuntime::new(self.config.clone()));
-        (WsIoLayer::new(runtime.clone()), WsIo(runtime))
+    pub fn build_layer(&self) -> (WsIoServerLayer, WsIoServer) {
+        let runtime = Arc::new(WsIoServerRuntime::new(self.config.clone()));
+        (WsIoServerLayer::new(runtime.clone()), WsIoServer(runtime))
     }
 
     pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {

@@ -1,6 +1,6 @@
-pub struct WsIoContext {
+pub struct WsIoServerContext {
     authorized: bool,
-    id: String,
+    sid: String,
 }
 
-impl WsIoContext {}
+impl WsIoServerContext {}

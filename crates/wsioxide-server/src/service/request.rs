@@ -13,7 +13,7 @@ use tokio::spawn;
 use tungstenite::handshake::derive_accept_key;
 use url::form_urlencoded;
 
-use crate::runtime::WsIoRuntime;
+use crate::runtime::WsIoServerRuntime;
 
 #[inline]
 fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &str) -> bool {
@@ -24,7 +24,7 @@ fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, exp
 
 pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     mut request: Request<ReqBody>,
-    runtime: Arc<WsIoRuntime>,
+    runtime: Arc<WsIoServerRuntime>,
 ) -> Result<Response<ResBody>, E> {
     // Check method
     if request.method() != Method::GET {
