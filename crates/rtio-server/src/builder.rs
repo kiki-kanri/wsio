@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::{
     WsIo,
     config::WsIoConfig,
@@ -29,8 +27,8 @@ impl WsIoBuilder {
         self
     }
 
-    pub fn request_path(mut self, request_path: impl Into<Cow<'static, str>>) -> Self {
-        self.config.request_path = request_path.into();
+    pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
+        self.config.request_path = request_path.as_ref().into();
         self
     }
 }

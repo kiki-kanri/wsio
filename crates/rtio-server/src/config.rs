@@ -1,11 +1,9 @@
-use std::borrow::Cow;
-
 use crate::packet::codecs::WsIoPacketCodec;
 
 #[derive(Clone, Debug)]
 pub(crate) struct WsIoConfig {
     pub(crate) default_codec: WsIoPacketCodec,
-    pub(crate) request_path: Cow<'static, str>,
+    pub(crate) request_path: String,
 }
 
 impl Default for WsIoConfig {

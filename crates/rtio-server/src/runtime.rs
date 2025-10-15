@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::{
     Result,
     bail,
@@ -25,13 +23,18 @@ impl WsIoRuntime {
         }
     }
 
-    pub(crate) fn add_ns(&self, path: Cow<'static, str>) -> Result<WsIoNamespace> {
-        if self.namespaces.contains_key(path.as_ref()) {
+    pub(crate) fn add_ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
+        let path = path.as_ref();
+        if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
         }
 
         let namespace = WsIoNamespace::new(path.as_ref(), self.clone());
         self.namespaces.insert(path.to_string(), namespace.clone());
         Ok(namespace)
+    }
+
+    pub fn of(&self, path: impl AsRef<str>) -> Option<WsIoNamespace> {
+        self.namespaces.get(path.as_ref()).map(|v| v.clone())
     }
 }

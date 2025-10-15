@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use anyhow::Result;
 
 mod builder;
@@ -23,7 +21,7 @@ impl WsIo {
     }
 
     #[inline]
-    pub fn ns(&self, path: impl Into<Cow<'static, str>>) -> Result<WsIoNamespace> {
-        Ok(self.0.add_ns(path.into())?)
+    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoNamespace> {
+        Ok(self.0.add_ns(path)?)
     }
 }
