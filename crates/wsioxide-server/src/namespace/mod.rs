@@ -3,10 +3,8 @@ use std::sync::Arc;
 pub(crate) mod builder;
 mod config;
 
-use builder::WsIoServerNamespaceBuilder;
 use config::WsIoServerNamespaceConfig;
 use dashmap::DashMap;
-use hyper::upgrade::Upgraded;
 
 use crate::{
     connection::WsIoServerConnection,
@@ -30,14 +28,6 @@ impl WsIoServerNamespace {
     }
 
     // Protected methods
-    pub(crate) fn builder(path: impl AsRef<str>, runtime: Arc<WsIoServerRuntime>) -> WsIoServerNamespaceBuilder {
-        WsIoServerNamespaceBuilder::new(path.as_ref(), runtime)
-    }
-
-    pub(crate) async fn register_connection(&self, connection: Arc<WsIoServerConnection>, upgraded: Upgraded) {
-        self.connections
-            .insert(connection.sid().to_string(), connection.clone());
-    }
 
     // Public methods
 

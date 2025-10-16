@@ -33,11 +33,11 @@ impl WsIoServer {
 
     #[inline]
     pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
-        self.0.get_namespace(path)
+        self.0.get_namespace(path.as_ref())
     }
 
     #[inline]
     pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
-        self.0.new_namespace_builder(path)
+        self.0.new_namespace_builder(path.as_ref())
     }
 }

@@ -30,8 +30,8 @@ impl WsIoServerRuntime {
     // Protected methods
 
     #[inline]
-    pub(crate) fn get_namespace(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
-        self.namespaces.get(path.as_ref()).map(|v| v.clone())
+    pub(crate) fn get_namespace(&self, path: &str) -> Option<Arc<WsIoServerNamespace>> {
+        self.namespaces.get(path).map(|v| v.clone())
     }
 
     #[inline]
@@ -45,8 +45,7 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
-        let path = path.as_ref();
+    pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: &str) -> Result<WsIoServerNamespaceBuilder> {
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
         }

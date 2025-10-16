@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use bson::oid::ObjectId;
+use futures::{
+    SinkExt,
+    StreamExt,
+};
 use http::{
     HeaderName,
     Method,
@@ -10,8 +13,19 @@ use http::{
     header,
 };
 use hyper::upgrade::OnUpgrade;
-use tokio::spawn;
-use tungstenite::handshake::derive_accept_key;
+use hyper_util::rt::TokioIo;
+use tokio::{
+    select,
+    spawn,
+};
+use tokio_tungstenite::{
+    WebSocketStream,
+    tungstenite::protocol::Role,
+};
+use tungstenite::{
+    Message,
+    handshake::derive_accept_key,
+};
 use url::form_urlencoded;
 
 use crate::{
@@ -82,8 +96,37 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     spawn(async move {
         match on_upgrade.await {
             Ok(upgraded) => {
-                let connection = Arc::new(WsIoServerConnection::new(ObjectId::new().to_hex(), headers));
-                namespace.register_connection(connection, upgraded).await;
+                let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace);
+                let connection = Arc::new(connection);
+
+                let ws_stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
+                let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
+
+                let read_ws_stream_task = spawn(async move {
+                    while let Some(message) = ws_stream_reader.next().await {
+                        match message {
+                            Ok(Message::Close(_)) => {
+                                connection.on_close();
+                                break;
+                            }
+                            Ok(msg) => connection.on_message(msg).await,
+                            Err(_) => break,
+                        }
+                    }
+                });
+
+                let write_ws_stream_task = spawn(async move {
+                    while let Some(message) = message_rx.recv().await {
+                        if ws_stream_writer.send(message).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+
+                select! {
+                    _ = read_ws_stream_task => {},
+                    _ = write_ws_stream_task => {},
+                }
             }
             Err(e) => {}
         }
