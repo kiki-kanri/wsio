@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
-pub(crate) mod builder;
-mod config;
-
+use anyhow::Result;
 use config::WsIoServerNamespaceConfig;
 use dashmap::DashMap;
+use serde::Serialize;
+use tokio_tungstenite::tungstenite::Message;
+use wsioxide_core::packet::WsIoPacket;
+
+pub(crate) mod builder;
+mod config;
 
 use crate::{
     connection::WsIoServerConnection,
@@ -28,6 +32,18 @@ impl WsIoServerNamespace {
     }
 
     // Protected methods
+    pub(crate) fn encode_packet_to_message<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Message> {
+        let bytes = self.config.packet_codec.encode(packet)?;
+        Ok(match self.config.packet_codec.is_text() {
+            true => Message::Text(unsafe { String::from_utf8_unchecked(bytes).into() }),
+            false => Message::Binary(bytes.into()),
+        })
+    }
+
+    #[inline]
+    pub(crate) fn requires_auth(&self) -> bool {
+        self.config.auth_handler.is_some()
+    }
 
     // Public methods
 

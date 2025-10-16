@@ -13,9 +13,11 @@ use super::super::WsIoPacket;
 pub(super) struct WsIoPacketSerdeJsonCodec;
 
 impl WsIoPacketSerdeJsonCodec {
+    pub(super) const IS_TEXT: bool = true;
+
     #[inline]
-    pub(super) fn encode<D: Serialize>(&self, packet: &WsIoPacket<D>) -> Result<Vec<u8>> {
-        Ok(to_vec(packet)?)
+    pub(super) fn encode<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Vec<u8>> {
+        Ok(to_vec(&packet)?)
     }
 
     #[inline]

@@ -15,6 +15,7 @@ use http::{
 use hyper::upgrade::OnUpgrade;
 use hyper_util::rt::TokioIo;
 use tokio::{
+    join,
     select,
     spawn,
 };
@@ -102,14 +103,15 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                 let ws_stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
                 let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
 
+                let connection_clone = connection.clone();
                 let read_ws_stream_task = spawn(async move {
                     while let Some(message) = ws_stream_reader.next().await {
                         match message {
                             Ok(Message::Close(_)) => {
-                                connection.on_close();
+                                connection_clone.on_close();
                                 break;
                             }
-                            Ok(msg) => connection.on_message(msg).await,
+                            Ok(msg) => connection_clone.on_message(msg).await,
                             Err(_) => break,
                         }
                     }
@@ -117,15 +119,22 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
 
                 let write_ws_stream_task = spawn(async move {
                     while let Some(message) = message_rx.recv().await {
-                        if ws_stream_writer.send(message).await.is_err() {
+                        let is_close = matches!(message, Message::Close(_));
+                        if is_close || ws_stream_writer.send(message).await.is_err() {
                             break;
                         }
                     }
                 });
 
-                select! {
-                    _ = read_ws_stream_task => {},
-                    _ = write_ws_stream_task => {},
+                if connection.init().await.is_ok() {
+                    select! {
+                        _ = read_ws_stream_task => {},
+                        _ = write_ws_stream_task => {},
+                    }
+                } else {
+                    connection.close();
+                    read_ws_stream_task.abort();
+                    let _ = join!(read_ws_stream_task, write_ws_stream_task);
                 }
             }
             Err(e) => {}

@@ -13,17 +13,20 @@ pub enum WsIoPacketType {
 
     #[serde(rename = "1")]
     Event,
+
+    #[serde(rename = "2")]
+    Init,
 }
 
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsIoPacket<D> {
-    #[serde(rename = "k")]
-    key: String,
-
     #[serde(rename = "d")]
-    data: Option<D>,
+    pub data: Option<D>,
+
+    #[serde(rename = "k")]
+    pub key: Option<String>,
 
     #[serde(rename = "t")]
-    packet_type: WsIoPacketType,
+    pub r#type: WsIoPacketType,
 }

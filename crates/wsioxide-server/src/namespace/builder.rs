@@ -17,6 +17,7 @@ pub struct WsIoServerNamespaceBuilder {
 impl WsIoServerNamespaceBuilder {
     pub(crate) fn new(path: &str, runtime: Arc<WsIoServerRuntime>) -> Self {
         let config = WsIoServerNamespaceConfig {
+            auth_handler: None,
             packet_codec: runtime.config.default_packet_codec.clone(),
             path: path.into(),
         };

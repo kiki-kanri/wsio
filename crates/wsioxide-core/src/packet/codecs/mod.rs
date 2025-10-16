@@ -40,7 +40,24 @@ pub enum WsIoPacketCodec {
 
 impl WsIoPacketCodec {
     #[inline]
-    fn encode<D: Serialize>(&self, packet: &WsIoPacket<D>) -> Result<Vec<u8>> {
+    pub fn decode<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<WsIoPacket<D>> {
+        match self {
+            #[cfg(feature = "packet-codec-bincode")]
+            Self::Bincode => WsIoPacketBincodeCodec.decode(bytes),
+
+            #[cfg(feature = "packet-codec-msgpack")]
+            Self::MsgPack => WsIoPacketMsgPackCodec.decode(bytes),
+
+            #[cfg(feature = "packet-codec-serde-json")]
+            Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode(bytes),
+
+            #[cfg(feature = "packet-codec-sonic-rs")]
+            Self::SonicRs => WsIoPacketSonicRsCodec.decode(bytes),
+        }
+    }
+
+    #[inline]
+    pub fn encode<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Vec<u8>> {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.encode(packet),
@@ -56,20 +73,19 @@ impl WsIoPacketCodec {
         }
     }
 
-    #[inline]
-    fn decode<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<WsIoPacket<D>> {
+    pub fn is_text(&self) -> bool {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
-            Self::Bincode => WsIoPacketBincodeCodec.decode(bytes),
+            Self::Bincode => WsIoPacketBincodeCodec::IS_TEXT,
 
             #[cfg(feature = "packet-codec-msgpack")]
-            Self::MsgPack => WsIoPacketMsgPackCodec.decode(bytes),
+            Self::MsgPack => WsIoPacketMsgPackCodec::IS_TEXT,
 
             #[cfg(feature = "packet-codec-serde-json")]
-            Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode(bytes),
+            Self::SerdeJson => WsIoPacketSerdeJsonCodec::IS_TEXT,
 
             #[cfg(feature = "packet-codec-sonic-rs")]
-            Self::SonicRs => WsIoPacketSonicRsCodec.decode(bytes),
+            Self::SonicRs => WsIoPacketSonicRsCodec::IS_TEXT,
         }
     }
 }
