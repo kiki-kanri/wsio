@@ -2,6 +2,7 @@ use serde::{
     Deserialize,
     Serialize,
 };
+use serde_with::skip_serializing_none;
 
 pub mod codecs;
 
@@ -14,13 +15,14 @@ pub enum WsIoPacketType {
     Event,
 }
 
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsIoPacket<D> {
     #[serde(rename = "k")]
     key: String,
 
     #[serde(rename = "d")]
-    data: D,
+    data: Option<D>,
 
     #[serde(rename = "t")]
     packet_type: WsIoPacketType,
