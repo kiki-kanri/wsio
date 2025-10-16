@@ -26,7 +26,6 @@ impl WsIoServerNamespaceBuilder {
         let config = WsIoServerNamespaceConfig {
             auth_handler: None,
             on_connect_handler: Arc::new(Box::new(move |connection| Box::pin(on_connect_handler(connection)))),
-            // on_connect_handler: Arc::new(Box::new(move |connection| Box::pin(on_connect_handler(connection)))),
             packet_codec: runtime.config.default_packet_codec.clone(),
             path: path.into(),
         };

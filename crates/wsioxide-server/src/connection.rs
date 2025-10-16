@@ -1,10 +1,14 @@
-use std::sync::Arc;
+use std::{
+    pin::Pin,
+    sync::Arc,
+};
 
 use anyhow::Result;
 use bson::oid::ObjectId;
 use http::HeaderMap;
 use serde::Serialize;
 use tokio::sync::{
+    Mutex,
     RwLock,
     mpsc::{
         UnboundedReceiver,
@@ -34,6 +38,15 @@ enum WsIoServerConnectionStatus {
 pub struct WsIoServerConnection {
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
+    on_disconnect_handler: Mutex<
+        Option<
+            Arc<
+                Box<
+                    dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync,
+                >,
+            >,
+        >,
+    >,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
@@ -46,6 +59,7 @@ impl WsIoServerConnection {
             Self {
                 headers,
                 namespace,
+                on_disconnect_handler: Mutex::new(None),
                 sid: ObjectId::new().to_string(),
                 status: RwLock::new(WsIoServerConnectionStatus::Created),
                 tx,
@@ -64,9 +78,13 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    pub(crate) async fn cleanup(&self) {
+    pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.namespace.cleanup_connection(&self.sid);
+        if let Some(on_disconnect_handler) = self.on_disconnect_handler.lock().await.take() {
+            let _ = on_disconnect_handler(self.clone()).await;
+        }
+
         *self.status.write().await = WsIoServerConnectionStatus::Closed;
     }
 
@@ -119,6 +137,17 @@ impl WsIoServerConnection {
     #[inline]
     pub fn namespace(&self) -> Arc<WsIoServerNamespace> {
         self.namespace.clone()
+    }
+
+    pub async fn on_disconnect<H, Fut>(&self, handler: H)
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.on_disconnect_handler
+            .lock()
+            .await
+            .replace(Arc::new(Box::new(move |connection| Box::pin(handler(connection)))));
     }
 
     #[inline]
