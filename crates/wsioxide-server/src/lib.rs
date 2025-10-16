@@ -40,16 +40,20 @@ impl WsIoServer {
     }
 
     #[inline]
-    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
-        self.0.get_namespace(path.as_ref())
-    }
-
-    #[inline]
-    pub fn ns<H, Fut>(&self, path: impl AsRef<str>, on_connect_handler: H) -> Result<WsIoServerNamespaceBuilder>
+    pub fn new_namespace_builder<H, Fut>(
+        &self,
+        path: impl AsRef<str>,
+        on_connect_handler: H,
+    ) -> Result<WsIoServerNamespaceBuilder>
     where
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.0.new_namespace_builder(path.as_ref(), on_connect_handler)
+    }
+
+    #[inline]
+    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
+        self.0.get_namespace(path.as_ref())
     }
 }

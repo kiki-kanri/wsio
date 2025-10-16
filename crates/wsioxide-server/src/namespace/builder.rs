@@ -35,7 +35,7 @@ impl WsIoServerNamespaceBuilder {
     }
 
     // Public methods
-    pub fn build(self) -> Result<Arc<WsIoServerNamespace>> {
+    pub fn register(self) -> Result<Arc<WsIoServerNamespace>> {
         let namespace = Arc::new(WsIoServerNamespace::new(self.config, self.runtime.clone()));
         self.runtime.insert_namespace(namespace.clone())?;
         Ok(namespace)
