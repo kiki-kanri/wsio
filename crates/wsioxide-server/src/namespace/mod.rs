@@ -40,6 +40,8 @@ impl WsIoServerNamespace {
     }
 
     // Public methods
+
+    #[inline]
     pub fn path(&self) -> &str {
         &self.config.path
     }

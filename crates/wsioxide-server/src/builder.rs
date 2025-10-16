@@ -5,7 +5,6 @@ use wsioxide_core::packet::codecs::WsIoPacketCodec;
 use crate::{
     WsIoServer,
     config::WsIoServerConfig,
-    layer::WsIoServerLayer,
     runtime::WsIoServerRuntime,
 };
 
@@ -21,9 +20,8 @@ impl WsIoServerBuilder {
     }
 
     // Public methods
-    pub fn build_layer(&self) -> (WsIoServerLayer, WsIoServer) {
-        let runtime = Arc::new(WsIoServerRuntime::new(self.config.clone()));
-        (WsIoServerLayer::new(runtime.clone()), WsIoServer(runtime))
+    pub fn build(self) -> WsIoServer {
+        WsIoServer(Arc::new(WsIoServerRuntime::new(self.config)))
     }
 
     pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {

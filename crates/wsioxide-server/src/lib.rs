@@ -12,6 +12,7 @@ mod runtime;
 mod service;
 
 use builder::WsIoServerBuilder;
+use layer::WsIoServerLayer;
 use namespace::{
     WsIoServerNamespace,
     builder::WsIoServerNamespaceBuilder,
@@ -24,6 +25,10 @@ pub struct WsIoServer(Arc<WsIoServerRuntime>);
 impl WsIoServer {
     pub fn builder() -> WsIoServerBuilder {
         WsIoServerBuilder::new()
+    }
+
+    pub fn layer(&self) -> WsIoServerLayer {
+        WsIoServerLayer::new(self.0.clone())
     }
 
     #[inline]

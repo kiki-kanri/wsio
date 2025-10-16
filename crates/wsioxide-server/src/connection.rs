@@ -16,6 +16,8 @@ impl WsIoServerConnection {
     }
 
     // Public methods
+
+    #[inline]
     pub fn sid(&self) -> &str {
         &self.sid
     }
