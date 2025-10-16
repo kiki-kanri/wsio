@@ -13,15 +13,20 @@ use tokio::sync::{
     },
 };
 use tokio_tungstenite::tungstenite::Message;
-use wsioxide_core::packet::{
-    WsIoPacket,
-    WsIoPacketType,
+
+use crate::{
+    core::packet::{
+        WsIoPacket,
+        WsIoPacketType,
+    },
+    namespace::WsIoServerNamespace,
 };
 
-use crate::namespace::WsIoServerNamespace;
-
-pub enum WsIoConnectionStatus {
+enum WsIoServerConnectionStatus {
+    Activating,
     AwaitingAuth,
+    Closed,
+    Closing,
     Created,
     Ready,
 }
@@ -30,7 +35,7 @@ pub struct WsIoServerConnection {
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
     sid: String,
-    status: RwLock<WsIoConnectionStatus>,
+    status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
 }
 
@@ -42,7 +47,7 @@ impl WsIoServerConnection {
                 headers,
                 namespace,
                 sid: ObjectId::new().to_string(),
-                status: RwLock::new(WsIoConnectionStatus::AwaitingAuth),
+                status: RwLock::new(WsIoServerConnectionStatus::Created),
                 tx,
             },
             rx,
@@ -51,13 +56,18 @@ impl WsIoServerConnection {
 
     // Protected methods
     pub(crate) async fn activate(self: &Arc<Self>) -> Result<()> {
-        self.namespace.add_connection(self.clone());
-        *self.status.write().await = WsIoConnectionStatus::Ready;
+        *self.status.write().await = WsIoServerConnectionStatus::Activating;
+        // TODO: middlewares
+        self.namespace.insert_connection(self.clone());
+        self.namespace.on_connect(self.clone()).await?;
+        *self.status.write().await = WsIoServerConnectionStatus::Ready;
         Ok(())
     }
 
-    pub(crate) fn cleanup(&self) {
+    pub(crate) async fn cleanup(&self) {
+        *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.namespace.cleanup_connection(&self.sid);
+        *self.status.write().await = WsIoServerConnectionStatus::Closed;
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
@@ -73,7 +83,7 @@ impl WsIoServerConnection {
 
         self.send_packet(packet)?;
         if require_auth {
-            *self.status.write().await = WsIoConnectionStatus::AwaitingAuth
+            *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth
         } else {
             self.activate().await?;
         }
@@ -81,7 +91,7 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    pub(crate) async fn on_message(&self, message: Message) {}
+    pub(crate) async fn on_message(&self, _message: Message) {}
 
     #[inline]
     pub(crate) fn send(&self, message: Message) {
@@ -104,6 +114,11 @@ impl WsIoServerConnection {
     #[inline]
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
+    }
+
+    #[inline]
+    pub fn namespace(&self) -> Arc<WsIoServerNamespace> {
+        self.namespace.clone()
     }
 
     #[inline]

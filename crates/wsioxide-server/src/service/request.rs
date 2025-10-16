@@ -123,20 +123,23 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                     }
                 });
 
-                if connection.clone().init().await.is_ok() {
-                    select! {
-                        _ = read_ws_stream_task => {},
-                        _ = write_ws_stream_task => {},
+                match connection.init().await {
+                    Ok(_) => {
+                        select! {
+                            _ = read_ws_stream_task => {},
+                            _ = write_ws_stream_task => {},
+                        }
                     }
-                } else {
-                    connection.close();
-                    read_ws_stream_task.abort();
-                    let _ = join!(read_ws_stream_task, write_ws_stream_task);
+                    Err(_) => {
+                        connection.close();
+                        read_ws_stream_task.abort();
+                        let _ = join!(read_ws_stream_task, write_ws_stream_task);
+                    }
                 }
 
-                connection.cleanup();
+                connection.cleanup().await;
             }
-            Err(e) => {}
+            Err(_) => {}
         }
     });
 

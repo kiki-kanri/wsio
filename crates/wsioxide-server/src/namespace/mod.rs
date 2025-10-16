@@ -5,17 +5,17 @@ use config::WsIoServerNamespaceConfig;
 use dashmap::DashMap;
 use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
-use wsioxide_core::packet::WsIoPacket;
 
 pub(crate) mod builder;
 mod config;
 
 use crate::{
+    WsIoServer,
     connection::WsIoServerConnection,
+    core::packet::WsIoPacket,
     runtime::WsIoServerRuntime,
 };
 
-#[derive(Clone)]
 pub struct WsIoServerNamespace {
     config: WsIoServerNamespaceConfig,
     connections: DashMap<String, Arc<WsIoServerConnection>>,
@@ -32,12 +32,11 @@ impl WsIoServerNamespace {
     }
 
     // Protected methods
-    pub(crate) fn add_connection(&self, connection: Arc<WsIoServerConnection>) {
-        self.connections.insert(connection.sid().into(), connection);
-    }
 
+    #[inline]
     pub(crate) fn cleanup_connection(&self, sid: &str) {
         self.connections.remove(sid);
+        self.runtime.cleanup_connection(sid);
     }
 
     pub(crate) fn encode_packet_to_message<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Message> {
@@ -49,6 +48,16 @@ impl WsIoServerNamespace {
     }
 
     #[inline]
+    pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
+        self.connections.insert(connection.sid().into(), connection.clone());
+        self.runtime.insert_connection(connection);
+    }
+
+    pub(crate) async fn on_connect(&self, connection: Arc<WsIoServerConnection>) -> Result<()> {
+        (self.config.on_connect_handler)(connection).await
+    }
+
+    #[inline]
     pub(crate) fn requires_auth(&self) -> bool {
         self.config.auth_handler.is_some()
     }
@@ -56,7 +65,17 @@ impl WsIoServerNamespace {
     // Public methods
 
     #[inline]
+    pub fn connection_count(&self) -> usize {
+        self.connections.len()
+    }
+
+    #[inline]
     pub fn path(&self) -> &str {
         &self.config.path
+    }
+
+    #[inline]
+    pub fn server(&self) -> WsIoServer {
+        WsIoServer(self.runtime.clone())
     }
 }

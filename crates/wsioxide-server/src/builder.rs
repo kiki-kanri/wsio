@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use wsioxide_core::packet::codecs::WsIoPacketCodec;
-
 use crate::{
     WsIoServer,
     config::WsIoServerConfig,
+    core::packet::codecs::WsIoPacketCodec,
     runtime::WsIoServerRuntime,
 };
 

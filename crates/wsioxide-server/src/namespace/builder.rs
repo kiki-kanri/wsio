@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use wsioxide_core::packet::codecs::WsIoPacketCodec;
 
 use super::{
     WsIoServerNamespace,
     config::WsIoServerNamespaceConfig,
 };
-use crate::runtime::WsIoServerRuntime;
+use crate::{
+    connection::WsIoServerConnection,
+    core::packet::codecs::WsIoPacketCodec,
+    runtime::WsIoServerRuntime,
+};
 
 pub struct WsIoServerNamespaceBuilder {
     config: WsIoServerNamespaceConfig,
@@ -15,9 +18,15 @@ pub struct WsIoServerNamespaceBuilder {
 }
 
 impl WsIoServerNamespaceBuilder {
-    pub(crate) fn new(path: &str, runtime: Arc<WsIoServerRuntime>) -> Self {
+    pub(crate) fn new<H, Fut>(path: &str, on_connect_handler: H, runtime: Arc<WsIoServerRuntime>) -> Self
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
         let config = WsIoServerNamespaceConfig {
             auth_handler: None,
+            on_connect_handler: Arc::new(Box::new(move |connection| Box::pin(on_connect_handler(connection)))),
+            // on_connect_handler: Arc::new(Box::new(move |connection| Box::pin(on_connect_handler(connection)))),
             packet_codec: runtime.config.default_packet_codec.clone(),
             path: path.into(),
         };

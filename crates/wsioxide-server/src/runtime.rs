@@ -8,6 +8,7 @@ use dashmap::DashMap;
 
 use crate::{
     config::WsIoServerConfig,
+    connection::WsIoServerConnection,
     namespace::{
         WsIoServerNamespace,
         builder::WsIoServerNamespaceBuilder,
@@ -16,6 +17,7 @@ use crate::{
 
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
+    connections: DashMap<String, Arc<WsIoServerConnection>>,
     namespaces: DashMap<String, Arc<WsIoServerNamespace>>,
 }
 
@@ -23,6 +25,7 @@ impl WsIoServerRuntime {
     pub(crate) fn new(config: WsIoServerConfig) -> Self {
         Self {
             config,
+            connections: DashMap::new(),
             namespaces: DashMap::new(),
         }
     }
@@ -30,8 +33,23 @@ impl WsIoServerRuntime {
     // Protected methods
 
     #[inline]
+    pub(crate) fn cleanup_connection(&self, sid: &str) {
+        self.connections.remove(sid);
+    }
+
+    #[inline]
+    pub(crate) fn connection_count(&self) -> usize {
+        self.connections.len()
+    }
+
+    #[inline]
     pub(crate) fn get_namespace(&self, path: &str) -> Option<Arc<WsIoServerNamespace>> {
         self.namespaces.get(path).map(|v| v.clone())
+    }
+
+    #[inline]
+    pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
+        self.connections.insert(connection.sid().into(), connection);
     }
 
     #[inline]
@@ -45,11 +63,19 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: &str) -> Result<WsIoServerNamespaceBuilder> {
+    pub(crate) fn new_namespace_builder<H, Fut>(
+        self: &Arc<Self>,
+        path: &str,
+        on_connect_handler: H,
+    ) -> Result<WsIoServerNamespaceBuilder>
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
         }
 
-        Ok(WsIoServerNamespaceBuilder::new(path, self.clone()))
+        Ok(WsIoServerNamespaceBuilder::new(path, on_connect_handler, self.clone()))
     }
 }

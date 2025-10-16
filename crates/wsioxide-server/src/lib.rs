@@ -11,13 +11,16 @@ mod namespace;
 mod runtime;
 mod service;
 
-use builder::WsIoServerBuilder;
-use layer::WsIoServerLayer;
-use namespace::{
-    WsIoServerNamespace,
-    builder::WsIoServerNamespaceBuilder,
+use crate::{
+    builder::WsIoServerBuilder,
+    connection::WsIoServerConnection,
+    layer::WsIoServerLayer,
+    namespace::{
+        WsIoServerNamespace,
+        builder::WsIoServerNamespaceBuilder,
+    },
+    runtime::WsIoServerRuntime,
 };
-use runtime::WsIoServerRuntime;
 
 #[derive(Clone)]
 pub struct WsIoServer(Arc<WsIoServerRuntime>);
@@ -25,6 +28,11 @@ pub struct WsIoServer(Arc<WsIoServerRuntime>);
 impl WsIoServer {
     pub fn builder() -> WsIoServerBuilder {
         WsIoServerBuilder::new()
+    }
+
+    #[inline]
+    pub fn connection_count(&self) -> usize {
+        self.0.connection_count()
     }
 
     pub fn layer(&self) -> WsIoServerLayer {
@@ -37,7 +45,11 @@ impl WsIoServer {
     }
 
     #[inline]
-    pub fn ns(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
-        self.0.new_namespace_builder(path.as_ref())
+    pub fn ns<H, Fut>(&self, path: impl AsRef<str>, on_connect_handler: H) -> Result<WsIoServerNamespaceBuilder>
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.0.new_namespace_builder(path.as_ref(), on_connect_handler)
     }
 }

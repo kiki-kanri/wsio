@@ -1,4 +1,4 @@
-use wsioxide_core::packet::codecs::WsIoPacketCodec;
+use crate::core::packet::codecs::WsIoPacketCodec;
 
 #[derive(Debug)]
 pub(crate) struct WsIoServerConfig {
