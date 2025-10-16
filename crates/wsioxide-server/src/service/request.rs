@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bson::oid::ObjectId;
 use http::{
     HeaderName,
     Method,
@@ -13,7 +14,10 @@ use tokio::spawn;
 use tungstenite::handshake::derive_accept_key;
 use url::form_urlencoded;
 
-use crate::runtime::WsIoServerRuntime;
+use crate::{
+    connection::WsIoServerConnection,
+    runtime::WsIoServerRuntime,
+};
 
 #[inline]
 fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &str) -> bool {
@@ -74,9 +78,13 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         None => return respond(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
+    let headers = request.headers().clone();
     spawn(async move {
         match on_upgrade.await {
-            Ok(upgraded) => namespace.handle_upgraded_ws(upgraded).await,
+            Ok(upgraded) => {
+                let connection = Arc::new(WsIoServerConnection::new(ObjectId::new().to_hex(), headers));
+                namespace.register_connection(connection, upgraded).await;
+            }
             Err(e) => {}
         }
     });

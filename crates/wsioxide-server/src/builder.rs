@@ -15,7 +15,7 @@ pub struct WsIoServerBuilder {
 
 impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
-        WsIoServerBuilder {
+        Self {
             config: WsIoServerConfig::default(),
         }
     }

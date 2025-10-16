@@ -21,7 +21,7 @@ pub(crate) struct WsIoServerRuntime {
 
 impl WsIoServerRuntime {
     pub(crate) fn new(config: WsIoServerConfig) -> Self {
-        WsIoServerRuntime {
+        Self {
             config,
             namespaces: DashMap::new(),
         }

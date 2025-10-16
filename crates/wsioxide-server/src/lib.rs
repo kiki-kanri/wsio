@@ -5,7 +5,7 @@ pub use wsioxide_core as core;
 
 mod builder;
 mod config;
-mod context;
+pub mod connection;
 mod layer;
 mod namespace;
 mod runtime;
