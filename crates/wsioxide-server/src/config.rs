@@ -1,6 +1,6 @@
 use wsioxide_core::packet::codecs::WsIoPacketCodec;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct WsIoServerConfig {
     pub(crate) default_packet_codec: WsIoPacketCodec,
     pub(crate) request_path: String,

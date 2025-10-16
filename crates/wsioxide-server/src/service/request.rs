@@ -107,10 +107,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                 let read_ws_stream_task = spawn(async move {
                     while let Some(message) = ws_stream_reader.next().await {
                         match message {
-                            Ok(Message::Close(_)) => {
-                                connection_clone.on_close();
-                                break;
-                            }
+                            Ok(Message::Close(_)) => break,
                             Ok(msg) => connection_clone.on_message(msg).await,
                             Err(_) => break,
                         }
@@ -126,7 +123,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                     }
                 });
 
-                if connection.init().await.is_ok() {
+                if connection.clone().init().await.is_ok() {
                     select! {
                         _ = read_ws_stream_task => {},
                         _ = write_ws_stream_task => {},
@@ -136,6 +133,8 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                     read_ws_stream_task.abort();
                     let _ = join!(read_ws_stream_task, write_ws_stream_task);
                 }
+
+                connection.cleanup();
             }
             Err(e) => {}
         }

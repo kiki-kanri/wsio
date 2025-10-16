@@ -50,12 +50,17 @@ impl WsIoServerConnection {
     }
 
     // Protected methods
-    pub(crate) async fn activate(&self) -> Result<()> {
+    pub(crate) async fn activate(self: &Arc<Self>) -> Result<()> {
+        self.namespace.add_connection(self.clone());
         *self.status.write().await = WsIoConnectionStatus::Ready;
         Ok(())
     }
 
-    pub(crate) async fn init(&self) -> Result<()> {
+    pub(crate) fn cleanup(&self) {
+        self.namespace.cleanup_connection(&self.sid);
+    }
+
+    pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
         #[derive(Serialize)]
         struct Data(String, bool);
 
@@ -75,8 +80,6 @@ impl WsIoServerConnection {
 
         Ok(())
     }
-
-    pub(crate) fn on_close(&self) {}
 
     pub(crate) async fn on_message(&self, message: Message) {}
 
