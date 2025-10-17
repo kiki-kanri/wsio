@@ -1,7 +1,4 @@
-use std::{
-    pin::Pin,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use anyhow::Result;
 use bson::oid::ObjectId;
@@ -24,6 +21,7 @@ use crate::{
         WsIoPacketType,
     },
     namespace::WsIoServerNamespace,
+    types::handler::WsIoServerConnectionOnDisconnectHandler,
 };
 
 enum WsIoServerConnectionStatus {
@@ -38,15 +36,7 @@ enum WsIoServerConnectionStatus {
 pub struct WsIoServerConnection {
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
-    on_disconnect_handler: Mutex<
-        Option<
-            Arc<
-                Box<
-                    dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync,
-                >,
-            >,
-        >,
-    >,
+    on_disconnect_handler: Mutex<Option<WsIoServerConnectionOnDisconnectHandler>>,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,

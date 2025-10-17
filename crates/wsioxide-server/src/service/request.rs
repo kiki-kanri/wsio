@@ -95,51 +95,48 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
 
     let headers = request.headers().clone();
     spawn(async move {
-        match on_upgrade.await {
-            Ok(upgraded) => {
-                let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace);
-                let connection = Arc::new(connection);
+        if let Ok(upgraded) = on_upgrade.await {
+            let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace);
+            let connection = Arc::new(connection);
 
-                let ws_stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
-                let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
+            let ws_stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
+            let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
 
-                let connection_clone = connection.clone();
-                let read_ws_stream_task = spawn(async move {
-                    while let Some(message) = ws_stream_reader.next().await {
-                        match message {
-                            Ok(Message::Close(_)) => break,
-                            Ok(msg) => connection_clone.on_message(msg).await,
-                            Err(_) => break,
-                        }
-                    }
-                });
-
-                let write_ws_stream_task = spawn(async move {
-                    while let Some(message) = message_rx.recv().await {
-                        let is_close = matches!(message, Message::Close(_));
-                        if is_close || ws_stream_writer.send(message).await.is_err() {
-                            break;
-                        }
-                    }
-                });
-
-                match connection.init().await {
-                    Ok(_) => {
-                        select! {
-                            _ = read_ws_stream_task => {},
-                            _ = write_ws_stream_task => {},
-                        }
-                    }
-                    Err(_) => {
-                        connection.close();
-                        read_ws_stream_task.abort();
-                        let _ = join!(read_ws_stream_task, write_ws_stream_task);
+            let connection_clone = connection.clone();
+            let read_ws_stream_task = spawn(async move {
+                while let Some(message) = ws_stream_reader.next().await {
+                    match message {
+                        Ok(Message::Close(_)) => break,
+                        Ok(msg) => connection_clone.on_message(msg).await,
+                        Err(_) => break,
                     }
                 }
+            });
 
-                connection.cleanup().await;
+            let write_ws_stream_task = spawn(async move {
+                while let Some(message) = message_rx.recv().await {
+                    let is_close = matches!(message, Message::Close(_));
+                    if is_close || ws_stream_writer.send(message).await.is_err() {
+                        break;
+                    }
+                }
+            });
+
+            match connection.init().await {
+                Ok(_) => {
+                    select! {
+                        _ = read_ws_stream_task => {},
+                        _ = write_ws_stream_task => {},
+                    }
+                }
+                Err(_) => {
+                    connection.close();
+                    read_ws_stream_task.abort();
+                    let _ = join!(read_ws_stream_task, write_ws_stream_task);
+                }
             }
-            Err(_) => {}
+
+            connection.cleanup().await;
         }
     });
 
