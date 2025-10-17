@@ -32,7 +32,7 @@ tokio-tungstenite = "0.28.0"
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
 tungstenite = "0.28.0"
-wsioxide-core = { path = "../wsioxide-core", version = "0.1.0", optional = true }
+wsioxide-core = { path = "../wsioxide-core", version = "0.1.0" }
 url = "2.5.7"
 
 [features]
