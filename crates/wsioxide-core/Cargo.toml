@@ -29,10 +29,10 @@ sonic-rs = { version = "0.5.5", optional = true }
 [features]
 default = ["packet-codec-serde-json"]
 
-packet-codec-bincode = ["bincode"]
-packet-codec-msgpack = ["rmp-serde"]
-packet-codec-serde-json = ["serde_json"]
-packet-codec-sonic-rs = ["sonic-rs"]
+packet-codec-bincode = ["dep:bincode"]
+packet-codec-msgpack = ["dep:rmp-serde"]
+packet-codec-serde-json = ["dep:serde_json"]
+packet-codec-sonic-rs = ["dep:sonic-rs"]
 
 all = [
   "packet-codec-bincode",
