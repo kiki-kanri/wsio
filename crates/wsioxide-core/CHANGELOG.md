@@ -2,7 +2,7 @@
 
 # v0.1.0
 
-[compare changes](https://github.com/kiki-kanri/node-ciphers/compare/5b4d5d49...wsioxide-core-v0.1.0)
+[compare changes](https://github.com/kiki-kanri/wsioxide/compare/5b4d5d49...wsioxide-core-v0.1.0)
 
 ### 🚀 Enhancements
 
