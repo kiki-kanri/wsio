@@ -39,7 +39,12 @@ impl WsIoServerNamespace {
         self.runtime.cleanup_connection(sid);
     }
 
-    pub(crate) fn encode_packet_to_message<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Message> {
+    #[inline]
+    pub(crate) fn encode_packet_data<D: Serialize>(&self, data: &D) -> Result<Vec<u8>> {
+        self.config.packet_codec.encode_data(data)
+    }
+
+    pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
         let bytes = self.config.packet_codec.encode(packet)?;
         Ok(match self.config.packet_codec.is_text() {
             true => Message::Text(unsafe { String::from_utf8_unchecked(bytes).into() }),

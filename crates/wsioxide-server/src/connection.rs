@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use bson::oid::ObjectId;
 use http::HeaderMap;
-use serde::Serialize;
 use tokio::sync::{
     Mutex,
     RwLock,
@@ -79,20 +78,18 @@ impl WsIoServerConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
-        #[derive(Serialize)]
-        struct Data(String, bool);
-
         let require_auth = self.namespace.requires_auth();
         let packet = WsIoPacket {
-            data: Some(Data(self.sid.clone(), require_auth)),
-            key: None,
+            data: Some(self.namespace.encode_packet_data(&require_auth)?),
+            key: Some(self.sid.clone()),
             r#type: WsIoPacketType::Init,
         };
 
-        self.send_packet(packet)?;
         if require_auth {
-            *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth
+            *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
+            self.send_packet(&packet)?;
         } else {
+            self.send_packet(&packet)?;
             self.activate().await?;
         }
 
@@ -107,7 +104,7 @@ impl WsIoServerConnection {
     }
 
     #[inline]
-    pub(crate) fn send_packet<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<()> {
+    pub(crate) fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
         self.send(self.namespace.encode_packet_to_message(packet)?);
         Ok(())
     }

@@ -20,9 +20,9 @@ pub enum WsIoPacketType {
 
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct WsIoPacket<D> {
+pub struct WsIoPacket {
     #[serde(rename = "d")]
-    pub data: Option<D>,
+    pub data: Option<Vec<u8>>,
 
     #[serde(rename = "k")]
     pub key: Option<String>,

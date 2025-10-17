@@ -18,25 +18,37 @@ use super::super::{
 };
 
 #[derive(Deserialize, Serialize)]
-struct InnerPacket<D>(Option<D>, Option<String>, WsIoPacketType);
+struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketBincodeCodec;
 
 impl WsIoPacketBincodeCodec {
     pub(super) const IS_TEXT: bool = false;
 
     #[inline]
-    pub(super) fn encode<D: Serialize>(&self, packet: WsIoPacket<D>) -> Result<Vec<u8>> {
-        let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);
-        Ok(encode_to_vec(inner_packet, standard())?)
-    }
-
-    #[inline]
-    pub(super) fn decode<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<WsIoPacket<D>> {
-        let (inner_packet, _) = decode_from_slice::<InnerPacket<D>, _>(bytes, standard())?;
+    pub(super) fn decode(&self, bytes: &[u8]) -> Result<WsIoPacket> {
+        let (inner_packet, _) = decode_from_slice::<InnerPacket, _>(bytes, standard())?;
         Ok(WsIoPacket {
             data: inner_packet.0,
             key: inner_packet.1,
             r#type: inner_packet.2,
         })
+    }
+
+    #[inline]
+    pub(super) fn decode_data<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<D> {
+        let (data, _) = decode_from_slice::<D, _>(bytes, standard())?;
+        Ok(data)
+    }
+
+    // TODO: &WsIoPacket
+    #[inline]
+    pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
+        let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);
+        Ok(encode_to_vec(inner_packet, standard())?)
+    }
+
+    #[inline]
+    pub(super) fn encode_data<D: Serialize>(&self, data: &D) -> Result<Vec<u8>> {
+        Ok(encode_to_vec(data, standard())?)
     }
 }
