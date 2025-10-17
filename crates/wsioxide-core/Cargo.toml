@@ -5,6 +5,13 @@ version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**",
+  "Cargo.toml",
+  "../../LICENSE*",
+  "../../README.md",
+]
+
 license.workspace = true
 readme.workspace = true
 repository.workspace = true

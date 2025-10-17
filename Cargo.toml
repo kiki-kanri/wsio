@@ -1,8 +1,9 @@
 [workspace]
-resolver = "3"
 members = [
   "crates/*",
 ]
+
+resolver = "3"
 
 [workspace.package]
 authors = ["kiki-kanri"]
