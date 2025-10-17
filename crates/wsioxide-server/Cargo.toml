@@ -3,6 +3,7 @@ name = "wsioxide-server"
 version = "0.1.0"
 
 authors.workspace = true
+description = "server"
 edition.workspace = true
 homepage.workspace = true
 include = [
