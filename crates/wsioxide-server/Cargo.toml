@@ -7,14 +7,14 @@ description = "server"
 edition.workspace = true
 homepage.workspace = true
 include = [
-  "src/**",
-  "Cargo.toml",
   "../../LICENSE*",
-  "../../README.md",
+  "./Cargo.toml",
+  "./README.md",
+  "./src/**",
 ]
 
 license.workspace = true
-readme.workspace = true
+readme = "./README.md"
 repository.workspace = true
 
 [dependencies]
