@@ -137,7 +137,7 @@ impl WsIoServerConnection {
         self.on_disconnect_handler
             .lock()
             .await
-            .replace(Arc::new(Box::new(move |connection| Box::pin(handler(connection)))));
+            .replace(Box::new(move |connection| Box::pin(handler(connection))));
     }
 
     #[inline]
