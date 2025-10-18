@@ -36,17 +36,15 @@ wsioxide-core = { path = "../wsioxide-core", version = "0.1.0" }
 url = "2.5.7"
 
 [features]
-default = ["packet-codec-serde-json"]
+default = []
 
 packet-codec-bincode = ["wsioxide-core/packet-codec-bincode"]
 packet-codec-msgpack = ["wsioxide-core/packet-codec-msgpack"]
-packet-codec-serde-json = ["wsioxide-core/packet-codec-serde-json"]
 packet-codec-sonic-rs = ["wsioxide-core/packet-codec-sonic-rs"]
 
 all = [
   "packet-codec-bincode",
   "packet-codec-msgpack",
-  "packet-codec-serde-json",
   "packet-codec-sonic-rs"
 ]
 
