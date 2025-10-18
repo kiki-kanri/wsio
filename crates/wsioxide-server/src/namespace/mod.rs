@@ -1,14 +1,9 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use anyhow::Result;
 use config::WsIoServerNamespaceConfig;
 use dashmap::DashMap;
-use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
-use wsioxide_core::packet::codecs::WsIoPacketCodec;
 
 pub(crate) mod builder;
 mod config;
@@ -21,7 +16,7 @@ use crate::{
 };
 
 pub struct WsIoServerNamespace {
-    config: WsIoServerNamespaceConfig,
+    pub(crate) config: WsIoServerNamespaceConfig,
     connections: DashMap<String, Arc<WsIoServerConnection>>,
     runtime: Arc<WsIoServerRuntime>,
 }
@@ -38,19 +33,9 @@ impl WsIoServerNamespace {
     // Protected methods
 
     #[inline]
-    pub fn auth_timeout(&self) -> Duration {
-        self.config.auth_timeout
-    }
-
-    #[inline]
     pub(crate) fn cleanup_connection(&self, sid: &str) {
         self.connections.remove(sid);
         self.runtime.cleanup_connection(sid);
-    }
-
-    #[inline]
-    pub(crate) fn encode_packet_data<D: Serialize>(&self, data: &D) -> Result<Vec<u8>> {
-        self.config.packet_codec.encode_data(data)
     }
 
     pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
@@ -67,15 +52,6 @@ impl WsIoServerNamespace {
         self.runtime.insert_connection(connection);
     }
 
-    pub(crate) async fn on_connect(&self, connection: Arc<WsIoServerConnection>) -> Result<()> {
-        (self.config.on_connect_handler)(connection).await
-    }
-
-    #[inline]
-    pub(crate) fn requires_auth(&self) -> bool {
-        self.config.auth_handler.is_some()
-    }
-
     // Public methods
 
     #[inline]
@@ -86,11 +62,6 @@ impl WsIoServerNamespace {
     #[inline]
     pub fn path(&self) -> &str {
         &self.config.path
-    }
-
-    #[inline]
-    pub fn packet_codec(&self) -> &WsIoPacketCodec {
-        &self.config.packet_codec
     }
 
     #[inline]

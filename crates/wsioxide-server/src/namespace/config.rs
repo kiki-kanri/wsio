@@ -12,8 +12,8 @@ use crate::{
     types::handler::WsIoServerConnectionOnConnectHandler,
 };
 
-pub(super) struct WsIoServerNamespaceConfig {
-    pub(super) auth_handler: Option<
+pub(crate) struct WsIoServerNamespaceConfig {
+    pub(crate) auth_handler: Option<
         Arc<
             dyn Fn(Arc<WsIoServerConnection>, Vec<u8>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
                 + Send
@@ -21,8 +21,8 @@ pub(super) struct WsIoServerNamespaceConfig {
                 + 'static,
         >,
     >,
-    pub(super) auth_timeout: Duration,
-    pub(super) on_connect_handler: WsIoServerConnectionOnConnectHandler,
-    pub(super) packet_codec: WsIoPacketCodec,
+    pub(crate) auth_timeout: Duration,
+    pub(crate) on_connect_handler: WsIoServerConnectionOnConnectHandler,
+    pub(crate) packet_codec: WsIoPacketCodec,
     pub(super) path: String,
 }

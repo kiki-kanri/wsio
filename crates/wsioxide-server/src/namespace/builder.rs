@@ -33,7 +33,7 @@ impl WsIoServerNamespaceBuilder {
                 auth_handler: None,
                 auth_timeout: runtime.config.auth_timeout,
                 on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
-                packet_codec: runtime.config.default_packet_codec,
+                packet_codec: runtime.config.packet_codec,
                 path: path.into(),
             },
             runtime,
@@ -46,13 +46,18 @@ impl WsIoServerNamespaceBuilder {
         self
     }
 
+    pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
+        self.config.packet_codec = packet_codec;
+        self
+    }
+
     pub fn register(self) -> Result<Arc<WsIoServerNamespace>> {
         let namespace = Arc::new(WsIoServerNamespace::new(self.config, self.runtime.clone()));
         self.runtime.insert_namespace(namespace.clone())?;
         Ok(namespace)
     }
 
-    pub fn with_auth<H, Fut, A>(mut self, handler: H) -> WsIoServerNamespaceBuilder
+    pub fn with_auth<H, Fut, A>(mut self, handler: H) -> Self
     where
         H: Fn(Arc<WsIoServerConnection>, A) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
@@ -70,11 +75,6 @@ impl WsIoServerNamespaceBuilder {
         });
 
         self.config.auth_handler = Some(arc_handler);
-        self
-    }
-
-    pub fn with_packet_codec(mut self, packet_codec: WsIoPacketCodec) -> WsIoServerNamespaceBuilder {
-        self.config.packet_codec = packet_codec;
         self
     }
 }

@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use anyhow::Result;
 use bson::oid::ObjectId;
@@ -72,7 +69,7 @@ impl WsIoServerConnection {
         *self.status.write().await = WsIoServerConnectionStatus::Activating;
         // TODO: middlewares
         self.namespace.insert_connection(self.clone());
-        self.namespace.on_connect(self.clone()).await?;
+        (self.namespace.config.on_connect_handler)(self.clone()).await?;
         *self.status.write().await = WsIoServerConnectionStatus::Ready;
         let packet = WsIoPacket {
             data: None,
@@ -80,8 +77,7 @@ impl WsIoServerConnection {
             r#type: WsIoPacketType::Ready,
         };
 
-        self.send_packet(&packet)?;
-        Ok(())
+        self.send_packet(&packet)
     }
 
     pub(crate) async fn cleanup(self: &Arc<Self>) {
@@ -99,10 +95,10 @@ impl WsIoServerConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
-        self.send(Message::Text(format!("c{}", self.namespace.packet_codec()).into()))?;
-        let require_auth = self.namespace.requires_auth();
+        self.send(Message::Text(format!("c{}", self.namespace.config.packet_codec).into()))?;
+        let require_auth = self.namespace.config.auth_handler.is_some();
         let packet = WsIoPacket {
-            data: Some(self.namespace.encode_packet_data(&require_auth)?),
+            data: Some(self.namespace.config.packet_codec.encode_data(&require_auth)?),
             key: Some(self.sid.clone()),
             r#type: WsIoPacketType::Init,
         };
@@ -111,7 +107,7 @@ impl WsIoServerConnection {
             *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
             let connection = self.clone();
             self.wait_auth_timeout_task.lock().await.replace(spawn(async move {
-                sleep(connection.namespace.auth_timeout()).await;
+                sleep(connection.namespace.config.auth_timeout).await;
                 if matches!(
                     *connection.status.read().await,
                     WsIoServerConnectionStatus::AwaitingAuth

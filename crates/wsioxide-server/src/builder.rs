@@ -19,7 +19,7 @@ impl WsIoServerBuilder {
         Self {
             config: WsIoServerConfig {
                 auth_timeout: Duration::from_secs(5),
-                default_packet_codec: WsIoPacketCodec::SerdeJson,
+                packet_codec: WsIoPacketCodec::SerdeJson,
                 request_path: "/ws.io".into(),
             },
         }
@@ -30,13 +30,13 @@ impl WsIoServerBuilder {
         WsIoServer(Arc::new(WsIoServerRuntime::new(self.config)))
     }
 
-    pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
-        self.config.request_path = request_path.as_ref().into();
+    pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
+        self.config.packet_codec = packet_codec;
         self
     }
 
-    pub fn with_default_packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
-        self.config.default_packet_codec = packet_codec;
+    pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
+        self.config.request_path = request_path.as_ref().into();
         self
     }
 }
