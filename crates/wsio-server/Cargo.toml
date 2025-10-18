@@ -1,5 +1,5 @@
 [package]
-name = "wsioxide-server"
+name = "wsio-server"
 version = "0.1.0"
 
 authors.workspace = true
@@ -32,15 +32,15 @@ tokio-tungstenite = "0.28.0"
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
 tungstenite = "0.28.0"
-wsioxide-core = { path = "../wsioxide-core", version = "0.1.0" }
+wsio-core = { path = "../wsio-core", version = "0.1.0" }
 url = "2.5.7"
 
 [features]
 default = []
 
-packet-codec-bincode = ["wsioxide-core/packet-codec-bincode"]
-packet-codec-msgpack = ["wsioxide-core/packet-codec-msgpack"]
-packet-codec-sonic-rs = ["wsioxide-core/packet-codec-sonic-rs"]
+packet-codec-bincode = ["wsio-core/packet-codec-bincode"]
+packet-codec-msgpack = ["wsio-core/packet-codec-msgpack"]
+packet-codec-sonic-rs = ["wsio-core/packet-codec-sonic-rs"]
 
 all = [
   "packet-codec-bincode",

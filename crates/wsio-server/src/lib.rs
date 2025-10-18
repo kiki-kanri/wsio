@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-pub use wsioxide_core as core;
+pub use wsio_core as core;
 
 mod builder;
 mod config;

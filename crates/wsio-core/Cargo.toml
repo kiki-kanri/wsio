@@ -1,5 +1,5 @@
 [package]
-name = "wsioxide-core"
+name = "wsio-core"
 version = "0.1.0"
 
 authors.workspace = true
