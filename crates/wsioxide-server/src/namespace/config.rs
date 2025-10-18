@@ -15,7 +15,7 @@ use crate::{
 pub(crate) struct WsIoServerNamespaceConfig {
     pub(crate) auth_handler: Option<
         Arc<
-            dyn Fn(Arc<WsIoServerConnection>, Vec<u8>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
+            dyn for<'a> Fn(Arc<WsIoServerConnection>, &'a [u8]) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
                 + Send
                 + Sync
                 + 'static,

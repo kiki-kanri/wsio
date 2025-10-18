@@ -1,5 +1,4 @@
 use std::{
-    pin::Pin,
     sync::Arc,
     time::Duration,
 };
@@ -65,16 +64,15 @@ impl WsIoServerNamespaceBuilder {
     {
         let handler = Arc::new(handler);
         let packet_codec = self.config.packet_codec.clone();
-        let arc_handler = Arc::new(move |connection, bytes: Vec<u8>| {
+        self.config.auth_handler = Some(Arc::new(move |connection, bytes: &[u8]| {
             let handler = handler.clone();
             let packet_codec = packet_codec.clone();
             Box::pin(async move {
-                let auth_data = packet_codec.decode_data::<A>(&bytes)?;
+                let auth_data = packet_codec.decode_data::<A>(bytes)?;
                 handler(connection, auth_data).await
-            }) as Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
-        });
+            })
+        }));
 
-        self.config.auth_handler = Some(arc_handler);
         self
     }
 }
