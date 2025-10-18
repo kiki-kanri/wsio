@@ -5,6 +5,7 @@ use config::WsIoServerNamespaceConfig;
 use dashmap::DashMap;
 use serde::Serialize;
 use tokio_tungstenite::tungstenite::Message;
+use wsioxide_core::packet::codecs::WsIoPacketCodec;
 
 pub(crate) mod builder;
 mod config;
@@ -77,6 +78,11 @@ impl WsIoServerNamespace {
     #[inline]
     pub fn path(&self) -> &str {
         &self.config.path
+    }
+
+    #[inline]
+    pub fn packet_codec(&self) -> &WsIoPacketCodec {
+        &self.config.packet_codec
     }
 
     #[inline]

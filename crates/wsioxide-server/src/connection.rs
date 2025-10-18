@@ -85,6 +85,7 @@ impl WsIoServerConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
+        self.send(Message::Text(format!("c{}", self.namespace.packet_codec()).into()));
         let require_auth = self.namespace.requires_auth();
         let packet = WsIoPacket {
             data: Some(self.namespace.encode_packet_data(&require_auth)?),
