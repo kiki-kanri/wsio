@@ -105,14 +105,13 @@ impl WsIoServerConnection {
 
         match packet.r#type {
             WsIoPacketType::Auth => {
-                if let Some(auth_handler) = &self.namespace.config.auth_handler {
-                    if (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok() {
+                if let Some(auth_handler) = &self.namespace.config.auth_handler
+                    && (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok() {
                         self.abort_auth_timeout_task().await;
                         if self.activate().await.is_ok() {
                             return;
                         }
                     }
-                }
 
                 self.close();
             }

@@ -63,13 +63,11 @@ impl WsIoServerNamespaceBuilder {
         A: DeserializeOwned,
     {
         let handler = Arc::new(handler);
-        let packet_codec = self.config.packet_codec.clone();
         self.config.auth_handler = Some(Arc::new(move |connection, bytes: Option<&[u8]>| {
             let handler = handler.clone();
-            let packet_codec = packet_codec.clone();
             Box::pin(async move {
                 let auth_data = match bytes {
-                    Some(bytes) => Some(packet_codec.decode_data::<A>(bytes)?),
+                    Some(bytes) => Some(self.config.packet_codec.decode_data::<A>(bytes)?),
                     None => None,
                 };
 
