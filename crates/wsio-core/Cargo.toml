@@ -7,10 +7,9 @@ description = "core"
 edition.workspace = true
 homepage.workspace = true
 include = [
-  "../../LICENSE*",
-  "./Cargo.toml",
-  "./README.md",
-  "./src/**",
+  "Cargo.toml",
+  "README.md",
+  "src/**/*",
 ]
 
 license.workspace = true
