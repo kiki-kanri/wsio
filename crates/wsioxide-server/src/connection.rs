@@ -64,6 +64,13 @@ impl WsIoServerConnection {
         self.namespace.insert_connection(self.clone());
         self.namespace.on_connect(self.clone()).await?;
         *self.status.write().await = WsIoServerConnectionStatus::Ready;
+        let packet = WsIoPacket {
+            data: None,
+            key: None,
+            r#type: WsIoPacketType::Ready,
+        };
+
+        self.send_packet(&packet)?;
         Ok(())
     }
 

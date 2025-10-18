@@ -16,6 +16,9 @@ pub enum WsIoPacketType {
 
     #[serde(rename = "2")]
     Init,
+
+    #[serde(rename = "3")]
+    Ready,
 }
 
 #[skip_serializing_none]
