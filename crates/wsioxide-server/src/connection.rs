@@ -141,7 +141,7 @@ impl WsIoServerConnection {
 
     #[inline]
     pub fn close(&self) {
-        let _ = self.tx.send(Message::Close(None));
+        let _ = self.send(Message::Close(None));
     }
 
     #[inline]

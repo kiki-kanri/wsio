@@ -116,7 +116,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
             let write_ws_stream_task = spawn(async move {
                 while let Some(message) = message_rx.recv().await {
                     let is_close = matches!(message, Message::Close(_));
-                    if is_close || ws_stream_writer.send(message).await.is_err() {
+                    if ws_stream_writer.send(message).await.is_err() || is_close {
                         break;
                     }
                 }
