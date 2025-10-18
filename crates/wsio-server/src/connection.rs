@@ -38,13 +38,13 @@ enum WsIoServerConnectionStatus {
 }
 
 pub struct WsIoServerConnection {
+    auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
     on_disconnect_handler: Mutex<Option<WsIoServerConnectionOnDisconnectHandler>>,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
-    wait_auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl WsIoServerConnection {
@@ -52,20 +52,26 @@ impl WsIoServerConnection {
         let (tx, rx) = unbounded_channel();
         (
             Self {
+                auth_timeout_task: Mutex::new(None),
                 headers,
                 namespace,
                 on_disconnect_handler: Mutex::new(None),
                 sid: ObjectId::new().to_string(),
                 status: RwLock::new(WsIoServerConnectionStatus::Created),
                 tx,
-                wait_auth_timeout_task: Mutex::new(None),
             },
             rx,
         )
     }
 
     // Protected methods
-    pub(crate) async fn activate(self: &Arc<Self>) -> Result<()> {
+    async fn abort_auth_timeout_task(&self) {
+        if let Some(auth_timeout_task) = self.auth_timeout_task.lock().await.take() {
+            auth_timeout_task.abort();
+        }
+    }
+
+    async fn activate(self: &Arc<Self>) -> Result<()> {
         *self.status.write().await = WsIoServerConnectionStatus::Activating;
         // TODO: middlewares
         self.namespace.insert_connection(self.clone());
@@ -82,16 +88,37 @@ impl WsIoServerConnection {
 
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
-        if let Some(wait_auth_timeout_task) = self.wait_auth_timeout_task.lock().await.take() {
-            wait_auth_timeout_task.abort();
-        }
-
+        self.abort_auth_timeout_task().await;
         self.namespace.cleanup_connection(&self.sid);
         if let Some(on_disconnect_handler) = self.on_disconnect_handler.lock().await.take() {
             let _ = on_disconnect_handler(self.clone()).await;
         }
 
         *self.status.write().await = WsIoServerConnectionStatus::Closed;
+    }
+
+    pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
+        let packet = match self.namespace.config.packet_codec.decode(bytes) {
+            Ok(packet) => packet,
+            Err(_) => return,
+        };
+
+        match packet.r#type {
+            WsIoPacketType::Auth => {
+                if let Some(auth_handler) = &self.namespace.config.auth_handler {
+                    if (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok() {
+                        self.abort_auth_timeout_task().await;
+                        if self.activate().await.is_ok() {
+                            return;
+                        }
+                    }
+                }
+
+                self.close();
+            }
+            WsIoPacketType::Event => {}
+            _ => {}
+        }
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
@@ -106,7 +133,7 @@ impl WsIoServerConnection {
         if require_auth {
             *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
             let connection = self.clone();
-            self.wait_auth_timeout_task.lock().await.replace(spawn(async move {
+            self.auth_timeout_task.lock().await.replace(spawn(async move {
                 sleep(connection.namespace.config.auth_timeout).await;
                 if matches!(
                     *connection.status.read().await,
@@ -125,15 +152,13 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    pub(crate) async fn on_message(&self, _message: Message) {}
-
     #[inline]
-    pub(crate) fn send(&self, message: Message) -> Result<()> {
+    fn send(&self, message: Message) -> Result<()> {
         Ok(self.tx.send(message)?)
     }
 
     #[inline]
-    pub(crate) fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
+    fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
         self.send(self.namespace.encode_packet_to_message(packet)?)
     }
 

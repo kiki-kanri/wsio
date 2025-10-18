@@ -58,17 +58,21 @@ impl WsIoServerNamespaceBuilder {
 
     pub fn with_auth<H, Fut, A>(mut self, handler: H) -> Self
     where
-        H: Fn(Arc<WsIoServerConnection>, A) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoServerConnection>, Option<A>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         A: DeserializeOwned,
     {
         let handler = Arc::new(handler);
         let packet_codec = self.config.packet_codec.clone();
-        self.config.auth_handler = Some(Arc::new(move |connection, bytes: &[u8]| {
+        self.config.auth_handler = Some(Arc::new(move |connection, bytes: Option<&[u8]>| {
             let handler = handler.clone();
             let packet_codec = packet_codec.clone();
             Box::pin(async move {
-                let auth_data = packet_codec.decode_data::<A>(bytes)?;
+                let auth_data = match bytes {
+                    Some(bytes) => Some(packet_codec.decode_data::<A>(bytes)?),
+                    None => None,
+                };
+
                 handler(connection, auth_data).await
             })
         }));
