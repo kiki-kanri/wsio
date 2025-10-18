@@ -32,7 +32,7 @@ use self::serde_json::WsIoPacketSerdeJsonCodec;
 use self::sonic_rs::WsIoPacketSonicRsCodec;
 use super::WsIoPacket;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum WsIoPacketCodec {
     #[cfg(feature = "packet-codec-bincode")]
     Bincode,

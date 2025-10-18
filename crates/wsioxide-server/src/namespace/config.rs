@@ -1,6 +1,7 @@
 use std::{
     pin::Pin,
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -20,6 +21,7 @@ pub(super) struct WsIoServerNamespaceConfig {
                 + 'static,
         >,
     >,
+    pub(super) auth_timeout: Duration,
     pub(super) on_connect_handler: WsIoServerConnectionOnConnectHandler,
     pub(super) packet_codec: WsIoPacketCodec,
     pub(super) path: String,

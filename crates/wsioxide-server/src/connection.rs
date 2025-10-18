@@ -1,16 +1,24 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::Result;
 use bson::oid::ObjectId;
 use http::HeaderMap;
-use tokio::sync::{
-    Mutex,
-    RwLock,
-    mpsc::{
-        UnboundedReceiver,
-        UnboundedSender,
-        unbounded_channel,
+use tokio::{
+    spawn,
+    sync::{
+        Mutex,
+        RwLock,
+        mpsc::{
+            UnboundedReceiver,
+            UnboundedSender,
+            unbounded_channel,
+        },
     },
+    task::JoinHandle,
+    time::sleep,
 };
 use tokio_tungstenite::tungstenite::Message;
 
@@ -39,6 +47,7 @@ pub struct WsIoServerConnection {
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
+    wait_auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl WsIoServerConnection {
@@ -52,6 +61,7 @@ impl WsIoServerConnection {
                 sid: ObjectId::new().to_string(),
                 status: RwLock::new(WsIoServerConnectionStatus::Created),
                 tx,
+                wait_auth_timeout_task: Mutex::new(None),
             },
             rx,
         )
@@ -76,6 +86,10 @@ impl WsIoServerConnection {
 
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
+        if let Some(wait_auth_timeout_task) = self.wait_auth_timeout_task.lock().await.take() {
+            wait_auth_timeout_task.abort();
+        }
+
         self.namespace.cleanup_connection(&self.sid);
         if let Some(on_disconnect_handler) = self.on_disconnect_handler.lock().await.take() {
             let _ = on_disconnect_handler(self.clone()).await;
@@ -95,6 +109,17 @@ impl WsIoServerConnection {
 
         if require_auth {
             *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
+            let connection = self.clone();
+            self.wait_auth_timeout_task.lock().await.replace(spawn(async move {
+                sleep(connection.namespace.auth_timeout()).await;
+                if matches!(
+                    *connection.status.read().await,
+                    WsIoServerConnectionStatus::AwaitingAuth
+                ) {
+                    connection.close();
+                }
+            }));
+
             self.send_packet(&packet)?;
         } else {
             self.send_packet(&packet)?;

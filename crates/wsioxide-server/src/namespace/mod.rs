@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::Result;
 use config::WsIoServerNamespaceConfig;
@@ -33,6 +36,11 @@ impl WsIoServerNamespace {
     }
 
     // Protected methods
+
+    #[inline]
+    pub fn auth_timeout(&self) -> Duration {
+        self.config.auth_timeout
+    }
 
     #[inline]
     pub(crate) fn cleanup_connection(&self, sid: &str) {

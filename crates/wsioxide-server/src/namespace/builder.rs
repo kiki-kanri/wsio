@@ -1,6 +1,7 @@
 use std::{
     pin::Pin,
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -27,27 +28,35 @@ impl WsIoServerNamespaceBuilder {
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        let config = WsIoServerNamespaceConfig {
-            auth_handler: None,
-            on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
-            packet_codec: runtime.config.default_packet_codec.clone(),
-            path: path.into(),
-        };
-
-        Self { config, runtime }
+        Self {
+            config: WsIoServerNamespaceConfig {
+                auth_handler: None,
+                auth_timeout: runtime.config.auth_timeout,
+                on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
+                packet_codec: runtime.config.default_packet_codec,
+                path: path.into(),
+            },
+            runtime,
+        }
     }
 
     // Public methods
+    pub fn auth_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_timeout = duration;
+        self
+    }
+
     pub fn register(self) -> Result<Arc<WsIoServerNamespace>> {
         let namespace = Arc::new(WsIoServerNamespace::new(self.config, self.runtime.clone()));
         self.runtime.insert_namespace(namespace.clone())?;
         Ok(namespace)
     }
 
-    pub fn with_auth<H, Fut, A: DeserializeOwned>(mut self, handler: H) -> WsIoServerNamespaceBuilder
+    pub fn with_auth<H, Fut, A>(mut self, handler: H) -> WsIoServerNamespaceBuilder
     where
         H: Fn(Arc<WsIoServerConnection>, A) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
+        A: DeserializeOwned,
     {
         let handler = Arc::new(handler);
         let packet_codec = self.config.packet_codec.clone();

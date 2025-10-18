@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::{
     WsIoServer,
@@ -14,7 +17,11 @@ pub struct WsIoServerBuilder {
 impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
         Self {
-            config: WsIoServerConfig::default(),
+            config: WsIoServerConfig {
+                auth_timeout: Duration::from_secs(5),
+                default_packet_codec: WsIoPacketCodec::SerdeJson,
+                request_path: "/ws.io".into(),
+            },
         }
     }
 
