@@ -69,7 +69,6 @@ impl WsIoServerConnection {
         *self.status.write().await = WsIoServerConnectionStatus::Activating;
         // TODO: middlewares
         self.namespace.insert_connection(self.clone());
-        (self.namespace.config.on_connect_handler)(self.clone()).await?;
         *self.status.write().await = WsIoServerConnectionStatus::Ready;
         let packet = WsIoPacket {
             data: None,
@@ -77,7 +76,8 @@ impl WsIoServerConnection {
             r#type: WsIoPacketType::Ready,
         };
 
-        self.send_packet(&packet)
+        self.send_packet(&packet)?;
+        (self.namespace.config.on_connect_handler)(self.clone()).await
     }
 
     pub(crate) async fn cleanup(self: &Arc<Self>) {
