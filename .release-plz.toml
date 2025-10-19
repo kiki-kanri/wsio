@@ -11,9 +11,9 @@ body = """
 
 {% for commit in commits %}
 {%- if commit.scope -%}
-- *({{ commit.scope }})* {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}{%- if commit.links %} ({% for link in commit.links %}[{{ link.text }}]({{ link.href }}) {% endfor -%}){% endif %} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/ws-io/wsio-rs/commit/{{ commit.id | truncate(length=7, end="") }}))
+- *({{ commit.scope }})* {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}{%- if commit.links %} ({% for link in commit.links %}[{{ link.text }}]({{ link.href }}) {% endfor -%}){% endif %} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/ws-io/ws.io-rs/commit/{{ commit.id | truncate(length=7, end="") }}))
 {% else -%}
-- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}{%- if commit.links %} ({% for link in commit.links %}[{{ link.text }}]({{ link.href }}) {% endfor -%}){% endif %} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/ws-io/wsio-rs/commit/{{ commit.id | truncate(length=7, end="") }}))
+- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}{%- if commit.links %} ({% for link in commit.links %}[{{ link.text }}]({{ link.href }}) {% endfor -%}){% endif %} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/ws-io/ws.io-rs/commit/{{ commit.id | truncate(length=7, end="") }}))
 {% endif -%}
 {% endfor -%}
 {% endfor %}

@@ -1,1 +1,1 @@
-# wsio-rs
+# ws.io-rs
