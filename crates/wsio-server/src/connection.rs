@@ -146,7 +146,7 @@ impl WsIoServerConnection {
         if require_auth {
             *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
             let connection = self.clone();
-            self.auth_timeout_task.lock().await.replace(spawn(async move {
+            *self.auth_timeout_task.lock().await = Some(spawn(async move {
                 sleep(connection.namespace.config.auth_timeout).await;
                 if matches!(
                     *connection.status.read().await,
@@ -187,6 +187,7 @@ impl WsIoServerConnection {
         self.namespace.clone()
     }
 
+    #[inline]
     pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> Result<()>
     where
         H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
@@ -224,10 +225,7 @@ impl WsIoServerConnection {
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.on_disconnect_handler
-            .lock()
-            .await
-            .replace(Box::new(move |connection| Box::pin(handler(connection))));
+        *self.on_disconnect_handler.lock().await = Some(Box::new(move |connection| Box::pin(handler(connection))));
     }
 
     #[inline]
