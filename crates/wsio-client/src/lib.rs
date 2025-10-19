@@ -9,6 +9,7 @@ pub use wsio_core as core;
 
 mod builder;
 mod config;
+pub mod connection;
 mod runtime;
 
 use crate::{
