@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.2](https://github.com/ws-io/wsio-rs/compare/wsio-server-v0.1.1...wsio-server-v0.1.2) - 2025-10-19 00:28
+
+### 🏡 Chore
+
+- lint code ([945b186](https://github.com/ws-io/wsio-rs/commit/945b186))
+
+### 💅 Refactors
+
+- *(server)* update `namespace builder.with_auth` to change handler `data` parameter to `Option<&D>` ([61179f7](https://github.com/ws-io/wsio-rs/commit/61179f7))
+
+### 🚀 Enhancements
+
+- *(server)* add namespace middleware functionality ([4893bbc](https://github.com/ws-io/wsio-rs/commit/4893bbc))
+- *(server)* add connection.server method ([44d4c46](https://github.com/ws-io/wsio-rs/commit/44d4c46))
+- add `connection.on` method to register event handlers ([3e352f6](https://github.com/ws-io/wsio-rs/commit/3e352f6))
+
 ## [0.1.1](https://github.com/ws-io/wsio-rs/compare/wsio-server-v0.1.0...wsio-server-v0.1.1) - 2025-10-18 14:57
 
 ### 💅 Refactors
