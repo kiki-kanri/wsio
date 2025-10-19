@@ -204,7 +204,7 @@ impl WsIoServerConnection {
         }
 
         let handler = Arc::new(handler);
-        let packet_codec = self.namespace.config.packet_codec.clone();
+        let packet_codec = self.namespace.config.packet_codec;
         self.event_handlers.insert(
             event.to_string(),
             Arc::new(move |connection, bytes: Option<&[u8]>| {
