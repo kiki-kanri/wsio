@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use ::sonic_rs::{
     from_slice,
     to_vec,
@@ -11,6 +13,8 @@ use serde::{
 use super::super::WsIoPacket;
 
 pub(super) struct WsIoPacketSonicRsCodec;
+
+static EMPTY_DATA_ENCODED: LazyLock<Vec<u8>> = LazyLock::new(|| to_vec(&()).unwrap());
 
 impl WsIoPacketSonicRsCodec {
     pub(super) const IS_TEXT: bool = true;
@@ -28,6 +32,11 @@ impl WsIoPacketSonicRsCodec {
     #[inline]
     pub(super) fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
         Ok(to_vec(packet)?)
+    }
+
+    #[inline]
+    pub(super) fn empty_data_encoded(&self) -> &[u8] {
+        EMPTY_DATA_ENCODED.as_ref()
     }
 
     #[inline]

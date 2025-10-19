@@ -31,6 +31,7 @@ impl WsIoServerNamespaceBuilder {
             config: WsIoServerNamespaceConfig {
                 auth_handler: None,
                 auth_timeout: runtime.config.auth_timeout,
+                middleware: None,
                 on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
                 packet_codec: runtime.config.packet_codec,
                 path: path.into(),
@@ -56,25 +57,34 @@ impl WsIoServerNamespaceBuilder {
         Ok(namespace)
     }
 
-    pub fn with_auth<H, Fut, A>(mut self, handler: H) -> Self
+    pub fn with_auth<H, Fut, D>(mut self, handler: H) -> Self
     where
-        H: Fn(Arc<WsIoServerConnection>, Option<A>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoServerConnection>, Option<&D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
-        A: DeserializeOwned,
+        D: DeserializeOwned + Send + 'static,
     {
         let handler = Arc::new(handler);
         self.config.auth_handler = Some(Arc::new(move |connection, bytes: Option<&[u8]>| {
             let handler = handler.clone();
             Box::pin(async move {
                 let auth_data = match bytes {
-                    Some(bytes) => Some(self.config.packet_codec.decode_data::<A>(bytes)?),
+                    Some(bytes) => Some(self.config.packet_codec.decode_data::<D>(bytes)?),
                     None => None,
                 };
 
-                handler(connection, auth_data).await
+                handler(connection, auth_data.as_ref()).await
             })
         }));
 
+        self
+    }
+
+    pub fn with_middleware<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.middleware = Some(Box::new(move |connection| Box::pin(handler(connection))));
         self
     }
 }
