@@ -193,12 +193,13 @@ impl WsIoServerConnection {
         self.namespace.clone()
     }
 
-    pub fn on<H, Fut, D>(&self, event: &str, handler: H) -> Result<()>
+    pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> Result<()>
     where
         H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + 'static,
     {
+        let event = event.as_ref();
         if self.event_handlers.contains_key(event) {
             bail!("Event {} handler already exists", event);
         }
@@ -206,7 +207,7 @@ impl WsIoServerConnection {
         let handler = Arc::new(handler);
         let packet_codec = self.namespace.config.packet_codec;
         self.event_handlers.insert(
-            event.to_string(),
+            event.into(),
             Arc::new(move |connection, bytes: Option<&[u8]>| {
                 let handler = handler.clone();
                 Box::pin(async move {
