@@ -31,6 +31,7 @@ impl WsIoServerNamespaceBuilder {
             config: WsIoServerNamespaceConfig {
                 auth_handler: None,
                 auth_timeout: runtime.config.auth_timeout,
+                middleware: None,
                 on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
                 packet_codec: runtime.config.packet_codec,
                 path: path.into(),
@@ -75,6 +76,15 @@ impl WsIoServerNamespaceBuilder {
             })
         }));
 
+        self
+    }
+
+    pub fn with_middleware<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.middleware = Some(Box::new(move |connection| Box::pin(handler(connection))));
         self
     }
 }

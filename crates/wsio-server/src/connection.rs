@@ -84,7 +84,10 @@ impl WsIoServerConnection {
 
     async fn activate(self: &Arc<Self>) -> Result<()> {
         *self.status.write().await = WsIoServerConnectionStatus::Activating;
-        // TODO: middlewares
+        if let Some(middleware) = &self.namespace.config.middleware {
+            middleware(self.clone()).await?;
+        }
+
         self.namespace.insert_connection(self.clone());
         *self.status.write().await = WsIoServerConnectionStatus::Ready;
         let packet = WsIoPacket {
