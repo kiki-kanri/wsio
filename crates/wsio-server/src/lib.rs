@@ -27,6 +27,7 @@ use crate::{
 pub struct WsIoServer(Arc<WsIoServerRuntime>);
 
 impl WsIoServer {
+    // Public methods
     pub fn builder() -> WsIoServerBuilder {
         WsIoServerBuilder::new()
     }
