@@ -1,8 +1,13 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{
+    Result,
+    bail,
+};
 use bson::oid::ObjectId;
+use dashmap::DashMap;
 use http::HeaderMap;
+use serde::de::DeserializeOwned;
 use tokio::{
     spawn,
     sync::{
@@ -25,7 +30,10 @@ use crate::{
         WsIoPacketType,
     },
     namespace::WsIoServerNamespace,
-    types::handler::WsIoServerConnectionOnDisconnectHandler,
+    types::handler::{
+        WsIoServerConnectionEventHandler,
+        WsIoServerConnectionOnDisconnectHandler,
+    },
 };
 
 enum WsIoServerConnectionStatus {
@@ -39,6 +47,7 @@ enum WsIoServerConnectionStatus {
 
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
+    event_handlers: DashMap<String, WsIoServerConnectionEventHandler>,
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
     on_disconnect_handler: Mutex<Option<WsIoServerConnectionOnDisconnectHandler>>,
@@ -53,6 +62,7 @@ impl WsIoServerConnection {
         (
             Self {
                 auth_timeout_task: Mutex::new(None),
+                event_handlers: DashMap::new(),
                 headers,
                 namespace,
                 on_disconnect_handler: Mutex::new(None),
@@ -106,12 +116,13 @@ impl WsIoServerConnection {
         match packet.r#type {
             WsIoPacketType::Auth => {
                 if let Some(auth_handler) = &self.namespace.config.auth_handler
-                    && (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok() {
-                        self.abort_auth_timeout_task().await;
-                        if self.activate().await.is_ok() {
-                            return;
-                        }
+                    && (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok()
+                {
+                    self.abort_auth_timeout_task().await;
+                    if self.activate().await.is_ok() {
+                        return;
                     }
+                }
 
                 self.close();
             }
@@ -176,6 +187,37 @@ impl WsIoServerConnection {
     #[inline]
     pub fn namespace(&self) -> Arc<WsIoServerNamespace> {
         self.namespace.clone()
+    }
+
+    pub fn on<H, Fut, D>(&self, event: &str, handler: H) -> Result<()>
+    where
+        H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+        D: DeserializeOwned + Send + 'static,
+    {
+        if self.event_handlers.contains_key(event) {
+            bail!("Event {} handler already exists", event);
+        }
+
+        let handler = Arc::new(handler);
+        let packet_codec = self.namespace.config.packet_codec.clone();
+        self.event_handlers.insert(
+            event.to_string(),
+            Arc::new(move |connection, bytes: Option<&[u8]>| {
+                let handler = handler.clone();
+                Box::pin(async move {
+                    let bytes = match bytes {
+                        Some(bytes) => bytes,
+                        None => packet_codec.empty_data_encoded(),
+                    };
+
+                    let data = packet_codec.decode_data::<D>(bytes)?;
+                    handler(connection, &data).await
+                })
+            }),
+        );
+
+        Ok(())
     }
 
     pub async fn on_disconnect<H, Fut>(&self, handler: H)

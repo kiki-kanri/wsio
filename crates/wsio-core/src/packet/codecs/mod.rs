@@ -113,6 +113,19 @@ impl WsIoPacketCodec {
     }
 
     #[inline]
+    pub fn empty_data_encoded(&self) -> &[u8] {
+        match self {
+            #[cfg(feature = "packet-codec-bincode")]
+            Self::Bincode => WsIoPacketBincodeCodec.empty_data_encoded(),
+            #[cfg(feature = "packet-codec-msgpack")]
+            Self::MsgPack => WsIoPacketMsgPackCodec.empty_data_encoded(),
+            Self::SerdeJson => WsIoPacketSerdeJsonCodec.empty_data_encoded(),
+            #[cfg(feature = "packet-codec-sonic-rs")]
+            Self::SonicRs => WsIoPacketSonicRsCodec.empty_data_encoded(),
+        }
+    }
+
+    #[inline]
     pub fn encode_data<D: Serialize>(&self, data: &D) -> Result<Vec<u8>> {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
