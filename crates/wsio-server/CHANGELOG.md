@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.1.3...wsio-server-v0.2.0) - 2025-10-19 18:40
+
+### 🏡 Chore
+
+- *(server)* mark some functions is inline ([b238875](https://github.com/ws-io/ws.io-rs/commit/b238875))
+- *(server)* tidy up code ([4f7d5e5](https://github.com/ws-io/ws.io-rs/commit/4f7d5e5))
+
+### 💅 Refactors
+
+- major code overhaul ([09c6773](https://github.com/ws-io/ws.io-rs/commit/09c6773))
+- *(server)* use `= Some(...)` instead of `.replace(...)` when setting optional configuration values ([2feb398](https://github.com/ws-io/ws.io-rs/commit/2feb398))
+- remove functionality that sends codec type data after connection establishment ([f8190ff](https://github.com/ws-io/ws.io-rs/commit/f8190ff))
+
 ## [0.1.3](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.1.2...wsio-server-v0.1.3) - 2025-10-19 03:28
 
 ### 💅 Refactors
