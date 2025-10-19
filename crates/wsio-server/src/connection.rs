@@ -25,6 +25,7 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
+    WsIoServer,
     core::packet::{
         WsIoPacket,
         WsIoPacketType,
@@ -229,6 +230,11 @@ impl WsIoServerConnection {
             .lock()
             .await
             .replace(Box::new(move |connection| Box::pin(handler(connection))));
+    }
+
+    #[inline]
+    pub fn server(&self) -> WsIoServer {
+        self.namespace.server()
     }
 
     #[inline]
