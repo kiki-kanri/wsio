@@ -21,6 +21,7 @@ impl WsIoServerLayer {
 impl<S> Layer<S> for WsIoServerLayer {
     type Service = WsIoServerService<S>;
 
+    #[inline]
     fn layer(&self, inner: S) -> Self::Service {
         WsIoServerService::new(inner, self.runtime.clone())
     }

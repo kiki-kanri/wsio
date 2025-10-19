@@ -38,6 +38,7 @@ impl WsIoServerNamespace {
         self.runtime.cleanup_connection(sid);
     }
 
+    #[inline]
     pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
         let bytes = self.config.packet_codec.encode(packet)?;
         Ok(match self.config.packet_codec.is_text() {
