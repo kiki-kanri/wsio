@@ -18,6 +18,11 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0.100"
+futures = "0.3.31"
+serde = "1.0.228"
+tokio = "1.48.0"
+tokio-tungstenite = "0.28.0"
+url = "2.5.7"
 wsio-core = { path = "../wsio-core", version = "0.1.1" }
 
 [features]
