@@ -10,14 +10,13 @@ pub mod codecs;
 pub enum WsIoPacketType {
     #[serde(rename = "0")]
     Auth,
-
     #[serde(rename = "1")]
-    Event,
-
+    Disconnect,
     #[serde(rename = "2")]
-    Init,
-
+    Event,
     #[serde(rename = "3")]
+    Init,
+    #[serde(rename = "4")]
     Ready,
 }
 

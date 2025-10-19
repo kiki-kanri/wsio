@@ -22,17 +22,14 @@ pub struct WsIoServerNamespaceBuilder {
 }
 
 impl WsIoServerNamespaceBuilder {
-    pub(crate) fn new<H, Fut>(path: &str, on_connect_handler: H, runtime: Arc<WsIoServerRuntime>) -> Self
-    where
-        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<()>> + Send + 'static,
-    {
+    pub(crate) fn new(path: &str, runtime: Arc<WsIoServerRuntime>) -> Self {
         Self {
             config: WsIoServerNamespaceConfig {
                 auth_handler: None,
                 auth_timeout: runtime.config.auth_timeout,
                 middleware: None,
-                on_connect_handler: Box::new(move |connection| Box::pin(on_connect_handler(connection))),
+                on_connect_handler: None,
+                on_ready_handler: None,
                 packet_codec: runtime.config.packet_codec,
                 path: path.into(),
             },
@@ -43,6 +40,24 @@ impl WsIoServerNamespaceBuilder {
     // Public methods
     pub fn auth_timeout(mut self, duration: Duration) -> Self {
         self.config.auth_timeout = duration;
+        self
+    }
+
+    pub fn on_connect<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.on_connect_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
+        self
+    }
+
+    pub fn on_ready<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.on_ready_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
         self
     }
 
@@ -64,7 +79,7 @@ impl WsIoServerNamespaceBuilder {
         D: DeserializeOwned + Send + 'static,
     {
         let handler = Arc::new(handler);
-        self.config.auth_handler = Some(Arc::new(move |connection, bytes: Option<&[u8]>| {
+        self.config.auth_handler = Some(Box::new(move |connection, bytes: Option<&[u8]>| {
             let handler = handler.clone();
             Box::pin(async move {
                 let auth_data = match bytes {

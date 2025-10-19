@@ -118,7 +118,12 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
             let write_ws_stream_task = spawn(async move {
                 while let Some(message) = message_rx.recv().await {
                     let is_close = matches!(message, Message::Close(_));
-                    if ws_stream_writer.send(message).await.is_err() || is_close {
+                    if ws_stream_writer.send(message).await.is_err() {
+                        break;
+                    }
+
+                    if is_close {
+                        let _ = ws_stream_writer.flush().await;
                         break;
                     }
                 }
@@ -132,7 +137,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
                     }
                 }
                 Err(_) => {
-                    connection.close();
+                    connection.close().await;
                     read_ws_stream_task.abort();
                     let _ = join!(read_ws_stream_task, write_ws_stream_task);
                 }

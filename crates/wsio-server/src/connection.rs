@@ -33,7 +33,7 @@ use crate::{
     namespace::WsIoServerNamespace,
     types::handler::{
         WsIoServerConnectionEventHandler,
-        WsIoServerConnectionOnDisconnectHandler,
+        WsIoServerConnectionOnCloseHandler,
     },
 };
 
@@ -51,7 +51,7 @@ pub struct WsIoServerConnection {
     event_handlers: DashMap<String, WsIoServerConnectionEventHandler>,
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
-    on_disconnect_handler: Mutex<Option<WsIoServerConnectionOnDisconnectHandler>>,
+    on_close_handler: Mutex<Option<WsIoServerConnectionOnCloseHandler>>,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
@@ -66,7 +66,7 @@ impl WsIoServerConnection {
                 event_handlers: DashMap::new(),
                 headers,
                 namespace,
-                on_disconnect_handler: Mutex::new(None),
+                on_close_handler: Mutex::new(None),
                 sid: ObjectId::new().to_string(),
                 status: RwLock::new(WsIoServerConnectionStatus::Created),
                 tx,
@@ -83,32 +83,62 @@ impl WsIoServerConnection {
     }
 
     async fn activate(self: &Arc<Self>) -> Result<()> {
+        if matches!(
+            *self.status.read().await,
+            WsIoServerConnectionStatus::AwaitingAuth | WsIoServerConnectionStatus::Created
+        ) {
+            return Ok(());
+        }
+
         *self.status.write().await = WsIoServerConnectionStatus::Activating;
         if let Some(middleware) = &self.namespace.config.middleware {
             middleware(self.clone()).await?;
         }
 
+        if let Some(on_connect_handler) = &self.namespace.config.on_connect_handler {
+            on_connect_handler(self.clone()).await?;
+        }
+
         self.namespace.insert_connection(self.clone());
-        *self.status.write().await = WsIoServerConnectionStatus::Ready;
-        let packet = WsIoPacket {
+        self.send_packet(&WsIoPacket {
             data: None,
             key: None,
             r#type: WsIoPacketType::Ready,
-        };
+        })?;
 
-        self.send_packet(&packet)?;
-        (self.namespace.config.on_connect_handler)(self.clone()).await
+        *self.status.write().await = WsIoServerConnectionStatus::Ready;
+        if let Some(on_ready_handler) = &self.namespace.config.on_ready_handler {
+            on_ready_handler(self.clone()).await?;
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.abort_auth_timeout_task().await;
         self.namespace.cleanup_connection(&self.sid);
-        if let Some(on_disconnect_handler) = self.on_disconnect_handler.lock().await.take() {
-            let _ = on_disconnect_handler(self.clone()).await;
+        if let Some(on_close_handler) = self.on_close_handler.lock().await.take() {
+            let _ = on_close_handler(self.clone()).await;
         }
 
         *self.status.write().await = WsIoServerConnectionStatus::Closed;
+    }
+
+    pub(crate) async fn close(&self) {
+        {
+            let mut status = self.status.write().await;
+            if matches!(
+                *status,
+                WsIoServerConnectionStatus::Closed | WsIoServerConnectionStatus::Closing
+            ) {
+                return;
+            }
+
+            *status = WsIoServerConnectionStatus::Closing;
+        }
+
+        let _ = self.tx.send(Message::Close(None));
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
@@ -123,12 +153,14 @@ impl WsIoServerConnection {
                     && (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok()
                 {
                     self.abort_auth_timeout_task().await;
-                    if self.activate().await.is_ok() {
+                    if matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth)
+                        && self.activate().await.is_ok()
+                    {
                         return;
                     }
                 }
 
-                self.close();
+                self.close().await;
             }
             WsIoPacketType::Event => {}
             _ => {}
@@ -152,7 +184,7 @@ impl WsIoServerConnection {
                     *connection.status.read().await,
                     WsIoServerConnectionStatus::AwaitingAuth
                 ) {
-                    connection.close();
+                    connection.close().await;
                 }
             }));
 
@@ -171,10 +203,15 @@ impl WsIoServerConnection {
     }
 
     // Public methods
+    pub async fn disconnect(&self) {
+        let _ = self.send_packet(&WsIoPacket {
+            data: None,
+            key: None,
+            r#type: WsIoPacketType::Disconnect,
+        });
 
-    #[inline]
-    pub fn close(&self) {
-        let _ = self.tx.send(Message::Close(None));
+        // TODO: Should we wait for the disconnect packet to be sent or use spawn?
+        let _ = self.close().await;
     }
 
     #[inline]
@@ -203,7 +240,7 @@ impl WsIoServerConnection {
         let packet_codec = self.namespace.config.packet_codec;
         self.event_handlers.insert(
             event.into(),
-            Arc::new(move |connection, bytes: Option<&[u8]>| {
+            Box::new(move |connection, bytes: Option<&[u8]>| {
                 let handler = handler.clone();
                 Box::pin(async move {
                     let bytes = match bytes {
@@ -220,12 +257,12 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    pub async fn on_disconnect<H, Fut>(&self, handler: H)
+    pub async fn on_close<H, Fut>(&self, handler: H)
     where
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        *self.on_disconnect_handler.lock().await = Some(Box::new(move |connection| Box::pin(handler(connection))));
+        *self.on_close_handler.lock().await = Some(Box::new(move |connection| Box::pin(handler(connection))));
     }
 
     #[inline]

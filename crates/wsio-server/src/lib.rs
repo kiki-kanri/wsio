@@ -14,7 +14,6 @@ mod types;
 
 use crate::{
     builder::WsIoServerBuilder,
-    connection::WsIoServerConnection,
     layer::WsIoServerLayer,
     namespace::{
         WsIoServerNamespace,
@@ -42,16 +41,8 @@ impl WsIoServer {
     }
 
     #[inline]
-    pub fn new_namespace_builder<H, Fut>(
-        &self,
-        path: impl AsRef<str>,
-        on_connect_handler: H,
-    ) -> Result<WsIoServerNamespaceBuilder>
-    where
-        H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<()>> + Send + 'static,
-    {
-        self.0.new_namespace_builder(path.as_ref(), on_connect_handler)
+    pub fn new_namespace_builder(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
+        self.0.new_namespace_builder(path.as_ref())
     }
 
     #[inline]
