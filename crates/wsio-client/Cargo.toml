@@ -1,6 +1,6 @@
 [package]
 name = "wsio-client"
-version = "0.1.0"
+version = "0.1.1"
 
 authors.workspace = true
 description = "client"
@@ -23,7 +23,7 @@ serde = "1.0.228"
 tokio = "1.48.0"
 tokio-tungstenite = "0.28.0"
 url = "2.5.7"
-wsio-core = { path = "../wsio-core", version = "0.1.1" }
+wsio-core = { path = "../wsio-core", version = "0.2.0" }
 
 [features]
 default = []
