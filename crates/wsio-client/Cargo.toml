@@ -1,0 +1,36 @@
+[package]
+name = "wsio-client"
+version = "0.1.0"
+
+authors.workspace = true
+description = "client"
+edition.workspace = true
+homepage.workspace = true
+include = [
+  "Cargo.toml",
+  "README.md",
+  "src/**/*",
+]
+
+license.workspace = true
+readme = "./README.md"
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0.100"
+wsio-core = { path = "../wsio-core", version = "0.1.1" }
+
+[features]
+default = []
+
+packet-codec-bincode = ["wsio-core/packet-codec-bincode"]
+packet-codec-msgpack = ["wsio-core/packet-codec-msgpack"]
+packet-codec-sonic-rs = ["wsio-core/packet-codec-sonic-rs"]
+
+all = [
+  "packet-codec-bincode",
+  "packet-codec-msgpack",
+  "packet-codec-sonic-rs"
+]
+
+full = ["all"]
