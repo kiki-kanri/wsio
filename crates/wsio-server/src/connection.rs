@@ -136,7 +136,6 @@ impl WsIoServerConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
-        self.send(Message::Text(format!("c{}", self.namespace.config.packet_codec).into()))?;
         let require_auth = self.namespace.config.auth_handler.is_some();
         let packet = WsIoPacket {
             data: Some(self.namespace.config.packet_codec.encode_data(&require_auth)?),
@@ -167,20 +166,15 @@ impl WsIoServerConnection {
     }
 
     #[inline]
-    fn send(&self, message: Message) -> Result<()> {
-        Ok(self.tx.send(message)?)
-    }
-
-    #[inline]
     fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        self.send(self.namespace.encode_packet_to_message(packet)?)
+        Ok(self.tx.send(self.namespace.encode_packet_to_message(packet)?)?)
     }
 
     // Public methods
 
     #[inline]
     pub fn close(&self) {
-        let _ = self.send(Message::Close(None));
+        let _ = self.tx.send(Message::Close(None));
     }
 
     #[inline]

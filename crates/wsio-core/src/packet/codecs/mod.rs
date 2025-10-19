@@ -1,12 +1,3 @@
-use std::{
-    fmt::{
-        Display,
-        Formatter,
-        Result as FmtResult,
-    },
-    str::FromStr,
-};
-
 use anyhow::Result;
 use serde::{
     Serialize,
@@ -39,37 +30,6 @@ pub enum WsIoPacketCodec {
     SerdeJson,
     #[cfg(feature = "packet-codec-sonic-rs")]
     SonicRs,
-}
-
-impl Display for WsIoPacketCodec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            #[cfg(feature = "packet-codec-bincode")]
-            WsIoPacketCodec::Bincode => write!(f, "1"),
-            #[cfg(feature = "packet-codec-msgpack")]
-            WsIoPacketCodec::MsgPack => write!(f, "2"),
-            WsIoPacketCodec::SerdeJson => write!(f, "3"),
-            #[cfg(feature = "packet-codec-sonic-rs")]
-            WsIoPacketCodec::SonicRs => write!(f, "4"),
-        }
-    }
-}
-
-impl FromStr for WsIoPacketCodec {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            #[cfg(feature = "packet-codec-bincode")]
-            "1" => Ok(WsIoPacketCodec::Bincode),
-            #[cfg(feature = "packet-codec-msgpack")]
-            "2" => Ok(WsIoPacketCodec::MsgPack),
-            "3" => Ok(WsIoPacketCodec::SerdeJson),
-            #[cfg(feature = "packet-codec-sonic-rs")]
-            "4" => Ok(WsIoPacketCodec::SonicRs),
-            _ => Err("Invalid WsIoPacketCodec code"),
-        }
-    }
 }
 
 impl WsIoPacketCodec {
