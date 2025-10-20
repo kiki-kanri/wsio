@@ -179,20 +179,11 @@ impl WsIoServerConnection {
         let _ = self.message_tx.send(Message::Close(None)).await;
     }
 
-    pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
-        let packet = match self.namespace.config.packet_codec.decode(bytes) {
-            Ok(packet) => packet,
-            Err(_) => return,
-        };
-
-        if match packet.r#type {
+    pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
+        let packet = self.namespace.config.packet_codec.decode(bytes)?;
+        match packet.r#type {
             WsIoPacketType::Auth => self.handle_auth_packet(packet.data.as_deref()).await,
-            WsIoPacketType::Event => Ok(()),
-            _ => return,
-        }
-        .is_err()
-        {
-            self.close().await;
+            _ => Ok(()),
         }
     }
 

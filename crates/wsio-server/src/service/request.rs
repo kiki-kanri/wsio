@@ -105,12 +105,16 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
             let connection_clone = connection.clone();
             let read_ws_stream_task = spawn(async move {
                 while let Some(message) = ws_stream_reader.next().await {
-                    match message {
+                    if match message {
                         Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
                         Ok(Message::Close(_)) => break,
                         Ok(Message::Text(text)) => connection_clone.handle_incoming_packet(text.as_bytes()).await,
                         Err(_) => break,
-                        _ => {}
+                        _ => Ok(()),
+                    }
+                    .is_err()
+                    {
+                        break;
                     }
                 }
             });

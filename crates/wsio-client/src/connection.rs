@@ -170,13 +170,9 @@ impl WsIoClientConnection {
         let _ = self.message_tx.send(Message::Close(None)).await;
     }
 
-    pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
-        let packet = match self.runtime.config.packet_codec.decode(bytes) {
-            Ok(packet) => packet,
-            Err(_) => return,
-        };
-
-        if match packet.r#type {
+    pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
+        let packet = self.runtime.config.packet_codec.decode(bytes)?;
+        match packet.r#type {
             WsIoPacketType::Init => {
                 if let Some(packet_data) = packet.data.as_deref() {
                     self.handle_init_packet(packet_data).await
@@ -185,11 +181,7 @@ impl WsIoClientConnection {
                 }
             }
             WsIoPacketType::Ready => self.handle_ready_packet().await,
-            _ => return,
-        }
-        .is_err()
-        {
-            self.close().await;
+            _ => Ok(()),
         }
     }
 
