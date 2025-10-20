@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.2.0...wsio-server-v0.2.1) - 2025-10-20 05:35
+
+### 💅 Refactors
+
+- *(server)* refine error messages and prevent conflicting state transitions in `conn.handle_auth_packet` ([12feb87](https://github.com/ws-io/ws.io-rs/commit/12feb87))
+- *(server)* extract `auth` match block in `connection.handle_incoming_packet` into a separate method and modify packet type handling to close connection on handler error ([f46f73c](https://github.com/ws-io/ws.io-rs/commit/f46f73c))
+- *(server)* rename `cleanup_connection` to `remove_connection` ([8ebde37](https://github.com/ws-io/ws.io-rs/commit/8ebde37))
+- *(server)* move all type handlers into their respective individual files instead of defining them in `types/file` ([9d3e9d5](https://github.com/ws-io/ws.io-rs/commit/9d3e9d5))
+
+### 🚀 Enhancements
+
+- *(server)* add `connection.off` method ([9a2ceac](https://github.com/ws-io/ws.io-rs/commit/9a2ceac))
+
+### 🩹 Fixes
+
+- add missing Tokio features ([0fa2c13](https://github.com/ws-io/ws.io-rs/commit/0fa2c13))
+
 ## [0.2.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.1.3...wsio-server-v0.2.0) - 2025-10-19 18:40
 
 ### 🏡 Chore

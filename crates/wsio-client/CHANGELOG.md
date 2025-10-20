@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.1.1...wsio-client-v0.2.0) - 2025-10-20 05:35
+
+### 💅 Refactors
+
+- *(client)* rename `WsIoClientConfig.auth` to `auth_handler` ([0a73a04](https://github.com/ws-io/ws.io-rs/commit/0a73a04))
+
+### 🚀 Enhancements
+
+- *(client)* implement connection establishment with init/ready packet handling and add connection close/cleanup functionality ([28bb1a1](https://github.com/ws-io/ws.io-rs/commit/28bb1a1))
+
+### 🩹 Fixes
+
+- add missing Tokio features ([0fa2c13](https://github.com/ws-io/ws.io-rs/commit/0fa2c13))
+
 ## [0.1.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.1.0...wsio-client-v0.1.1) - 2025-10-19 18:40
 
 ### 🚀 Enhancements
