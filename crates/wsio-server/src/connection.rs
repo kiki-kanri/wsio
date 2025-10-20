@@ -143,9 +143,12 @@ impl WsIoServerConnection {
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
             (auth_handler)(self.clone(), packet_data).await?;
             self.abort_auth_timeout_task().await;
-            let status = self.status.read().await;
-            if !matches!(*status, WsIoServerConnectionStatus::Authenticating) {
-                bail!("Auth packet processed while connection status was {:#?}", *status);
+
+            {
+                let status = self.status.read().await;
+                if !matches!(*status, WsIoServerConnectionStatus::Authenticating) {
+                    bail!("Auth packet processed while connection status was {:#?}", *status);
+                }
             }
 
             self.activate().await?;
