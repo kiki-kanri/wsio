@@ -75,7 +75,7 @@ impl WsIoPacketCodec {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.encode(packet.clone()),
             #[cfg(feature = "packet-codec-cbor")]
-            Self::Cbor => WsIoPacketCborCodec.encode(&packet),
+            Self::Cbor => WsIoPacketCborCodec.encode(packet),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.encode(packet.clone()),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode(packet),

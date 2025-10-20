@@ -2,22 +2,22 @@ use serde::{
     Deserialize,
     Serialize,
 };
+use serde_repr::{
+    Deserialize_repr,
+    Serialize_repr,
+};
 use serde_with::skip_serializing_none;
 
 pub mod codecs;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
 pub enum WsIoPacketType {
-    #[serde(rename = "0")]
-    Auth,
-    #[serde(rename = "1")]
-    Disconnect,
-    #[serde(rename = "2")]
-    Event,
-    #[serde(rename = "3")]
-    Init,
-    #[serde(rename = "4")]
-    Ready,
+    Auth = 0,
+    Disconnect = 1,
+    Event = 2,
+    Init = 3,
+    Ready = 4,
 }
 
 #[skip_serializing_none]
