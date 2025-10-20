@@ -23,18 +23,18 @@ pub struct WsIoClientBuilder {
 }
 
 impl WsIoClientBuilder {
-    pub(crate) fn new(mut namespace_url: Url) -> Result<Self> {
-        if !matches!(namespace_url.scheme(), "ws" | "wss") {
-            bail!("Invalid namespace URL scheme: {}", namespace_url.scheme());
+    pub(crate) fn new(mut url: Url) -> Result<Self> {
+        if !matches!(url.scheme(), "ws" | "wss") {
+            bail!("Invalid URL scheme: {}", url.scheme());
         }
 
-        let namespace = namespace_url.path();
-        namespace_url.set_query(Some(&format!("namespace={}", namespace)));
-        namespace_url.set_path("ws.io");
+        let namespace = url.path();
+        url.set_query(Some(&format!("namespace={}", namespace)));
+        url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
                 auth_handler: None,
-                connect_url: namespace_url,
+                connect_url: url,
                 init_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
                 on_connection_ready_handler: None,

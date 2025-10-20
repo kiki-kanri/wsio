@@ -21,17 +21,17 @@ pub struct WsIoClient(Arc<WsIoClientRuntime>);
 
 impl WsIoClient {
     // Public methods
-    pub fn builder<U>(namespace_url: U) -> Result<WsIoClientBuilder>
+    pub fn builder<U>(url: U) -> Result<WsIoClientBuilder>
     where
         U: TryInto<Url>,
         U::Error: Display,
     {
-        let namespace_url = match namespace_url.try_into() {
-            Ok(namespace_url) => namespace_url,
-            Err(e) => panic!("Invalid namespace URL: {}", e),
+        let url = match url.try_into() {
+            Ok(url) => url,
+            Err(e) => panic!("Invalid URL: {}", e),
         };
 
-        WsIoClientBuilder::new(namespace_url)
+        WsIoClientBuilder::new(url)
     }
 
     pub async fn connect(&self) -> Result<()> {
