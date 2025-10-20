@@ -8,9 +8,7 @@ use anyhow::{
     bail,
 };
 use bson::oid::ObjectId;
-use dashmap::DashMap;
 use http::HeaderMap;
-use serde::de::DeserializeOwned;
 use tokio::{
     spawn,
     sync::{
@@ -47,13 +45,6 @@ enum WsIoServerConnectionStatus {
     Ready,
 }
 
-type EventHandler = Box<
-    dyn for<'a> Fn(Arc<WsIoServerConnection>, Option<&'a [u8]>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
-        + Send
-        + Sync
-        + 'static,
->;
-
 type OnCloseHandler = Box<
     dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
@@ -63,7 +54,6 @@ type OnCloseHandler = Box<
 
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
-    event_handlers: DashMap<String, EventHandler>,
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<OnCloseHandler>>,
@@ -78,7 +68,6 @@ impl WsIoServerConnection {
         (
             Self {
                 auth_timeout_task: Mutex::new(None),
-                event_handlers: DashMap::new(),
                 headers,
                 namespace,
                 on_close_handler: Mutex::new(None),
@@ -250,44 +239,6 @@ impl WsIoServerConnection {
     #[inline]
     pub fn namespace(&self) -> Arc<WsIoServerNamespace> {
         self.namespace.clone()
-    }
-
-    #[inline]
-    pub fn off(&self, event: impl AsRef<str>) {
-        self.event_handlers.remove(event.as_ref());
-    }
-
-    #[inline]
-    pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> Result<()>
-    where
-        H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<()>> + Send + 'static,
-        D: DeserializeOwned + Send + 'static,
-    {
-        let event = event.as_ref();
-        if self.event_handlers.contains_key(event) {
-            bail!("Event {} handler already exists", event);
-        }
-
-        let handler = Arc::new(handler);
-        let packet_codec = self.namespace.config.packet_codec;
-        self.event_handlers.insert(
-            event.into(),
-            Box::new(move |connection, bytes: Option<&[u8]>| {
-                let handler = handler.clone();
-                Box::pin(async move {
-                    let bytes = match bytes {
-                        Some(bytes) => bytes,
-                        None => packet_codec.empty_data_encoded(),
-                    };
-
-                    let data = packet_codec.decode_data::<D>(bytes)?;
-                    handler(connection, &data).await
-                })
-            }),
-        );
-
-        Ok(())
     }
 
     pub async fn on_close<H, Fut>(&self, handler: H)
