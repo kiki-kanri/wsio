@@ -11,9 +11,9 @@ use tokio::{
         Mutex,
         RwLock,
         mpsc::{
-            UnboundedReceiver,
-            UnboundedSender,
-            unbounded_channel,
+            Receiver,
+            Sender,
+            channel,
         },
     },
     task::JoinHandle,
@@ -43,24 +43,25 @@ pub(crate) enum WsIoClientConnectionStatus {
 
 pub struct WsIoClientConnection {
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
+    message_tx: Sender<Message>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
     status: RwLock<WsIoClientConnectionStatus>,
-    tx: UnboundedSender<Message>,
 }
 
 impl WsIoClientConnection {
-    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Self, UnboundedReceiver<Message>) {
-        let (tx, rx) = unbounded_channel();
+    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Self, Receiver<Message>) {
+        // TODO: use config set buf size
+        let (message_tx, message_rx) = channel(512);
         (
             Self {
                 init_timeout_task: Mutex::new(None),
+                message_tx,
                 ready_timeout_task: Mutex::new(None),
                 runtime,
                 status: RwLock::new(WsIoClientConnectionStatus::Created),
-                tx,
             },
-            rx,
+            message_rx,
         )
     }
 
@@ -97,7 +98,8 @@ impl WsIoClientConnection {
                     key: None,
                     data: auth_handler(self.clone()).await?,
                     r#type: WsIoPacketType::Auth,
-                })?;
+                })
+                .await?;
             } else {
                 bail!("Auth required but no auth handler is configured");
             }
@@ -127,9 +129,11 @@ impl WsIoClientConnection {
         Ok(())
     }
 
-    #[inline]
-    fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        Ok(self.tx.send(self.runtime.encode_packet_to_message(packet)?)?)
+    async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
+        Ok(self
+            .message_tx
+            .send(self.runtime.encode_packet_to_message(packet)?)
+            .await?)
     }
 
     // Protected methods
@@ -163,7 +167,7 @@ impl WsIoClientConnection {
             *status = WsIoClientConnectionStatus::Closing;
         }
 
-        let _ = self.tx.send(Message::Close(None));
+        let _ = self.message_tx.send(Message::Close(None)).await;
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {

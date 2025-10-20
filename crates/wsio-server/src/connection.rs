@@ -15,9 +15,9 @@ use tokio::{
         Mutex,
         RwLock,
         mpsc::{
-            UnboundedReceiver,
-            UnboundedSender,
-            unbounded_channel,
+            Receiver,
+            Sender,
+            channel,
         },
     },
     task::JoinHandle,
@@ -55,27 +55,28 @@ type OnCloseHandler = Box<
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     headers: HeaderMap,
+    message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<OnCloseHandler>>,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
-    tx: UnboundedSender<Message>,
 }
 
 impl WsIoServerConnection {
-    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Self, UnboundedReceiver<Message>) {
-        let (tx, rx) = unbounded_channel();
+    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Self, Receiver<Message>) {
+        // TODO: use config set buf size
+        let (message_tx, message_rx) = channel(512);
         (
             Self {
                 auth_timeout_task: Mutex::new(None),
                 headers,
+                message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),
                 sid: ObjectId::new().to_string(),
                 status: RwLock::new(WsIoServerConnectionStatus::Created),
-                tx,
             },
-            rx,
+            message_rx,
         )
     }
 
@@ -110,7 +111,8 @@ impl WsIoServerConnection {
             data: None,
             key: None,
             r#type: WsIoPacketType::Ready,
-        })?;
+        })
+        .await?;
 
         *self.status.write().await = WsIoServerConnectionStatus::Ready;
         if let Some(on_ready_handler) = &self.namespace.config.on_ready_handler {
@@ -139,9 +141,11 @@ impl WsIoServerConnection {
         }
     }
 
-    #[inline]
-    fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        Ok(self.tx.send(self.namespace.encode_packet_to_message(packet)?)?)
+    async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
+        Ok(self
+            .message_tx
+            .send(self.namespace.encode_packet_to_message(packet)?)
+            .await?)
     }
 
     // Protected methods
@@ -169,7 +173,7 @@ impl WsIoServerConnection {
             *status = WsIoServerConnectionStatus::Closing;
         }
 
-        let _ = self.tx.send(Message::Close(None));
+        let _ = self.message_tx.send(Message::Close(None));
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
@@ -210,9 +214,9 @@ impl WsIoServerConnection {
                 }
             }));
 
-            self.send_packet(&packet)?;
+            self.send_packet(&packet).await?;
         } else {
-            self.send_packet(&packet)?;
+            self.send_packet(&packet).await?;
             self.activate().await?;
         }
 
@@ -228,7 +232,7 @@ impl WsIoServerConnection {
         });
 
         // TODO: Should we wait for the disconnect packet to be sent or use spawn?
-        let _ = self.close().await;
+        self.close().await
     }
 
     #[inline]
