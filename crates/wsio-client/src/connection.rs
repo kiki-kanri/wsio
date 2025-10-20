@@ -123,8 +123,8 @@ impl WsIoClientConnection {
         }
 
         *self.status.write().await = WsIoClientConnectionStatus::Ready;
-        if let Some(on_ready_handler) = &self.runtime.config.on_ready_handler {
-            on_ready_handler(self.clone()).await?;
+        if let Some(on_connection_ready_handler) = &self.runtime.config.on_connection_ready_handler {
+            on_connection_ready_handler(self.clone()).await?;
         }
 
         Ok(())
