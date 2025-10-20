@@ -185,7 +185,7 @@ impl WsIoClientConnection {
                 }
             }
             WsIoPacketType::Ready => self.handle_ready_packet().await,
-            _ => Ok(()),
+            _ => return,
         }
         .is_err()
         {

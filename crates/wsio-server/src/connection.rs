@@ -134,8 +134,7 @@ impl WsIoServerConnection {
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
             (auth_handler)(self.clone(), packet_data).await?;
             self.abort_auth_timeout_task().await;
-            self.activate().await?;
-            Ok(())
+            self.activate().await
         } else {
             bail!("Auth packet received but no auth handler is configured");
         }
@@ -173,7 +172,7 @@ impl WsIoServerConnection {
             *status = WsIoServerConnectionStatus::Closing;
         }
 
-        let _ = self.message_tx.send(Message::Close(None));
+        let _ = self.message_tx.send(Message::Close(None)).await;
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) {
@@ -185,7 +184,7 @@ impl WsIoServerConnection {
         if match packet.r#type {
             WsIoPacketType::Auth => self.handle_auth_packet(packet.data.as_deref()).await,
             WsIoPacketType::Event => Ok(()),
-            _ => Ok(()),
+            _ => return,
         }
         .is_err()
         {
@@ -214,24 +213,23 @@ impl WsIoServerConnection {
                 }
             }));
 
-            self.send_packet(&packet).await?;
+            self.send_packet(&packet).await
         } else {
             self.send_packet(&packet).await?;
-            self.activate().await?;
+            self.activate().await
         }
-
-        Ok(())
     }
 
     // Public methods
     pub async fn disconnect(&self) {
-        let _ = self.send_packet(&WsIoPacket {
-            data: None,
-            key: None,
-            r#type: WsIoPacketType::Disconnect,
-        });
+        let _ = self
+            .send_packet(&WsIoPacket {
+                data: None,
+                key: None,
+                r#type: WsIoPacketType::Disconnect,
+            })
+            .await;
 
-        // TODO: Should we wait for the disconnect packet to be sent or use spawn?
         self.close().await
     }
 
