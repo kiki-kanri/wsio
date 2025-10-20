@@ -58,6 +58,11 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
+    pub(crate) fn namespace_count(&self) -> usize {
+        self.namespaces.len()
+    }
+
+    #[inline]
     pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: &str) -> Result<WsIoServerNamespaceBuilder> {
         if self.namespaces.contains_key(path) {
             bail!("Namespace {} already exists", path);
