@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use anyhow::{
     Result,
@@ -163,7 +160,7 @@ impl WsIoClientRuntime {
 
             let _ = self.run_connection().await;
             if matches!(*self.status.read().await, WsIoClientRuntimeStatus::Running) {
-                sleep(Duration::from_secs(1)).await;
+                sleep(self.config.reconnection_delay).await;
             } else {
                 break;
             }

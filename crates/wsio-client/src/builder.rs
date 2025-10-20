@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{
     Result,
@@ -32,9 +35,12 @@ impl WsIoClientBuilder {
             config: WsIoClientConfig {
                 auth_handler: None,
                 connect_url: namespace_url,
+                init_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
                 on_connection_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
+                ready_timeout: Duration::from_secs(3),
+                reconnection_delay: Duration::from_secs(1),
             },
         })
     }
@@ -64,6 +70,11 @@ impl WsIoClientBuilder {
         WsIoClient(Arc::new(WsIoClientRuntime::new(self.config)))
     }
 
+    pub fn init_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_timeout = duration;
+        self
+    }
+
     pub fn on_connection_close<H, Fut>(mut self, handler: H) -> Self
     where
         H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
@@ -84,6 +95,16 @@ impl WsIoClientBuilder {
 
     pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
         self.config.packet_codec = packet_codec;
+        self
+    }
+
+    pub fn ready_timeout(mut self, duration: Duration) -> Self {
+        self.config.ready_timeout = duration;
+        self
+    }
+
+    pub fn reconnection_delay(mut self, delay: Duration) -> Self {
+        self.config.reconnection_delay = delay;
         self
     }
 

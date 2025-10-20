@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use anyhow::{
     Result,
@@ -85,7 +82,7 @@ impl WsIoClientConnection {
         *self.status.write().await = WsIoClientConnectionStatus::AwaitingReady;
         let connection = self.clone();
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
-            sleep(Duration::from_secs(3)).await;
+            sleep(connection.runtime.config.ready_timeout).await;
             if matches!(
                 *connection.status.read().await,
                 WsIoClientConnectionStatus::AwaitingReady
@@ -196,7 +193,7 @@ impl WsIoClientConnection {
         *self.status.write().await = WsIoClientConnectionStatus::AwaitingInit;
         let connection = self.clone();
         *self.init_timeout_task.lock().await = Some(spawn(async move {
-            sleep(Duration::from_secs(3)).await;
+            sleep(connection.runtime.config.init_timeout).await;
             if matches!(
                 *connection.status.read().await,
                 WsIoClientConnectionStatus::AwaitingInit
