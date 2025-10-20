@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.3.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.2.1...wsio-server-v0.3.0) - 2025-10-20 17:48
+
+### 🏀 Examples
+
+- add client and server examples ([88a2fce](https://github.com/ws-io/ws.io-rs/commit/88a2fce))
+- *(server)* add examples file ([ff1444b](https://github.com/ws-io/ws.io-rs/commit/ff1444b))
+
+### 🏡 Chore
+
+- *(server)* reduce default `auth_timeout` duration ([3bf00cd](https://github.com/ws-io/ws.io-rs/commit/3bf00cd))
+
+### 💅 Refactors
+
+- update `handle_incoming_packet` to require successful decoding before processing; return error to upper layer and exit `read_ws_stream_task` on failure ([76bf3dd](https://github.com/ws-io/ws.io-rs/commit/76bf3dd))
+- *(server)* tidy up code ([90f94c5](https://github.com/ws-io/ws.io-rs/commit/90f94c5))
+- tidy up code ([4e5a362](https://github.com/ws-io/ws.io-rs/commit/4e5a362))
+- change `Connection` message `tx/rx` from `unbounded_channel` to bounded `channel` ([4e6a130](https://github.com/ws-io/ws.io-rs/commit/4e6a130))
+- *(server)* remove `WsIoServerConnection.on` method and related code ([dfe85d8](https://github.com/ws-io/ws.io-rs/commit/dfe85d8))
+- *(server)* remove unnecessary state checks ([153a9f4](https://github.com/ws-io/ws.io-rs/commit/153a9f4))
+
+### 🚀 Enhancements
+
+- add cbor packet codec ([f3e1fa9](https://github.com/ws-io/ws.io-rs/commit/f3e1fa9))
+- *(server)* add `cancel_token` getter to `WsIoServerConnection` and invoke `cancel_token.cancel` in `cleanup` ([3b1076d](https://github.com/ws-io/ws.io-rs/commit/3b1076d))
+- *(server)* add `namespace_count` method ([51d4867](https://github.com/ws-io/ws.io-rs/commit/51d4867))
+
+### 🩹 Fixes
+
+- *(server)* resolve status deadlock issue in `connection.handle_auth_packet` ([a36b54b](https://github.com/ws-io/ws.io-rs/commit/a36b54b))
+
 ## [0.2.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.2.0...wsio-server-v0.2.1) - 2025-10-20 05:35
 
 ### 💅 Refactors
