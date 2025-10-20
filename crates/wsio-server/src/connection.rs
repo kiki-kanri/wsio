@@ -225,6 +225,11 @@ impl WsIoServerConnection {
     }
 
     #[inline]
+    pub fn off(&self, event: impl AsRef<str>) {
+        self.event_handlers.remove(event.as_ref());
+    }
+
+    #[inline]
     pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> Result<()>
     where
         H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
