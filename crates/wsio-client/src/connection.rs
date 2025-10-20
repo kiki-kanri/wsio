@@ -136,7 +136,7 @@ impl WsIoClientConnection {
     }
 
     // Protected methods
-    pub(crate) async fn cleanup(&self) {
+    pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoClientConnectionStatus::Closing;
         if let Some(init_timeout_task) = self.init_timeout_task.lock().await.take() {
             init_timeout_task.abort();
@@ -144,6 +144,10 @@ impl WsIoClientConnection {
 
         if let Some(ready_timeout_task) = self.ready_timeout_task.lock().await.take() {
             ready_timeout_task.abort();
+        }
+
+        if let Some(on_connection_close_handler) = &self.runtime.config.on_connection_close_handler {
+            let _ = on_connection_close_handler(self.clone()).await;
         }
 
         *self.status.write().await = WsIoClientConnectionStatus::Closed;

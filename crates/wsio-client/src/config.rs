@@ -28,6 +28,7 @@ type OnlyConnectionParamHandler = Box<
 pub(crate) struct WsIoClientConfig {
     pub(crate) auth_handler: Option<AuthHandler>,
     pub(crate) connect_url: Url,
+    pub(crate) on_connection_close_handler: Option<OnlyConnectionParamHandler>,
     pub(crate) on_connection_ready_handler: Option<OnlyConnectionParamHandler>,
     pub(crate) packet_codec: WsIoPacketCodec,
 }

@@ -32,6 +32,7 @@ impl WsIoClientBuilder {
             config: WsIoClientConfig {
                 auth_handler: None,
                 connect_url: namespace_url,
+                on_connection_close_handler: None,
                 on_connection_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
             },
@@ -61,6 +62,15 @@ impl WsIoClientBuilder {
 
     pub fn build(self) -> WsIoClient {
         WsIoClient(Arc::new(WsIoClientRuntime::new(self.config)))
+    }
+
+    pub fn on_connection_close<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.on_connection_close_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
+        self
     }
 
     pub fn on_connection_ready<H, Fut>(mut self, handler: H) -> Self
