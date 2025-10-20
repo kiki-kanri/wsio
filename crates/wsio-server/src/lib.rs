@@ -10,7 +10,6 @@ mod layer;
 mod namespace;
 mod runtime;
 mod service;
-mod types;
 
 use crate::{
     builder::WsIoServerBuilder,

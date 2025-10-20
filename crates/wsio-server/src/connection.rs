@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    pin::Pin,
+    sync::Arc,
+};
 
 use anyhow::{
     Result,
@@ -31,10 +34,6 @@ use crate::{
         WsIoPacketType,
     },
     namespace::WsIoServerNamespace,
-    types::handler::{
-        WsIoServerConnectionEventHandler,
-        WsIoServerConnectionOnCloseHandler,
-    },
 };
 
 enum WsIoServerConnectionStatus {
@@ -46,12 +45,26 @@ enum WsIoServerConnectionStatus {
     Ready,
 }
 
+type EventHandler = Box<
+    dyn for<'a> Fn(Arc<WsIoServerConnection>, Option<&'a [u8]>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
+type OnCloseHandler = Box<
+    dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
-    event_handlers: DashMap<String, WsIoServerConnectionEventHandler>,
+    event_handlers: DashMap<String, EventHandler>,
     headers: HeaderMap,
     namespace: Arc<WsIoServerNamespace>,
-    on_close_handler: Mutex<Option<WsIoServerConnectionOnCloseHandler>>,
+    on_close_handler: Mutex<Option<OnCloseHandler>>,
     sid: String,
     status: RwLock<WsIoServerConnectionStatus>,
     tx: UnboundedSender<Message>,
