@@ -11,15 +11,15 @@ use crate::{
     core::packet::codecs::WsIoPacketCodec,
 };
 
+type AuthHandler = Arc<
+    dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'static>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
 pub(crate) struct WsIoClientConfig {
-    pub(crate) auth: Option<
-        Arc<
-            dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'static>>
-                + Send
-                + Sync
-                + 'static,
-        >,
-    >,
+    pub(crate) auth_handler: Option<AuthHandler>,
     pub(crate) connect_url: Url,
     pub(crate) packet_codec: WsIoPacketCodec,
 }

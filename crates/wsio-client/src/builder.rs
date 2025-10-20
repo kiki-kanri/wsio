@@ -30,7 +30,7 @@ impl WsIoClientBuilder {
         namespace_url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
-                auth: None,
+                auth_handler: None,
                 connect_url: namespace_url,
                 packet_codec: WsIoPacketCodec::SerdeJson,
             },
@@ -45,7 +45,7 @@ impl WsIoClientBuilder {
         D: Serialize,
     {
         let handler = Arc::new(handler);
-        self.config.auth = Some(Arc::new(move |connection| {
+        self.config.auth_handler = Some(Arc::new(move |connection| {
             let handler = handler.clone();
             Box::pin(async move {
                 Ok(match handler(connection).await? {
