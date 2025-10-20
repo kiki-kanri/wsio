@@ -36,8 +36,10 @@ use crate::{
     namespace::WsIoServerNamespace,
 };
 
+#[derive(Debug)]
 enum WsIoServerConnectionStatus {
     Activating,
+    Authenticating,
     AwaitingAuth,
     Closed,
     Closing,
@@ -96,14 +98,16 @@ impl WsIoServerConnection {
     }
 
     async fn activate(self: &Arc<Self>) -> Result<()> {
-        if matches!(
-            *self.status.read().await,
-            WsIoServerConnectionStatus::AwaitingAuth | WsIoServerConnectionStatus::Created
-        ) {
-            return Ok(());
+        {
+            let mut status = self.status.write().await;
+            match *status {
+                WsIoServerConnectionStatus::Authenticating | WsIoServerConnectionStatus::Created => {
+                    *status = WsIoServerConnectionStatus::Activating
+                }
+                _ => bail!("Cannot activate connection in invalid status: {:#?}", *status),
+            }
         }
 
-        *self.status.write().await = WsIoServerConnectionStatus::Activating;
         if let Some(middleware) = &self.namespace.config.middleware {
             middleware(self.clone()).await?;
         }
@@ -128,22 +132,27 @@ impl WsIoServerConnection {
     }
 
     async fn handle_auth_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
-        if !matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth) {
-            bail!("Auth packet received when not awaiting auth");
+        {
+            let mut status = self.status.write().await;
+            match *status {
+                WsIoServerConnectionStatus::AwaitingAuth => *status = WsIoServerConnectionStatus::Authenticating,
+                _ => bail!("Received auth packet in invalid status: {:#?}", *status),
+            }
         }
 
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
             (auth_handler)(self.clone(), packet_data).await?;
             self.abort_auth_timeout_task().await;
-            if !matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth) {
-                bail!("Auth packet received when not awaiting auth");
+            let status = self.status.read().await;
+            if !matches!(*status, WsIoServerConnectionStatus::Authenticating) {
+                bail!("Auth packet processed while connection status was {:#?}", *status);
             }
 
             self.activate().await?;
-            return Ok(());
+            Ok(())
+        } else {
+            bail!("Auth packet received but no auth handler is configured");
         }
-
-        bail!("Auth packet received but auth handler is not set");
     }
 
     #[inline]
