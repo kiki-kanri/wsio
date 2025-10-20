@@ -27,9 +27,10 @@ static MAIN_TASK_MANAGER: LazyLock<TaskManager> = LazyLock::new(TaskManager::new
 static WS_IO_SERVER: LazyLock<WsIoServer> = LazyLock::new(|| WsIoServer::builder().build());
 
 // Functions
-async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
+async fn on_close(connection: Arc<WsIoServerConnection>) -> Result<()> {
     println!(
-        "on_connect, sid: {}, ns conns: {}, server conns: {}",
+        "{}: on_close, sid: {}, ns conns: {}, server conns: {}",
+        connection.namespace().path(),
         connection.sid(),
         connection.namespace().connection_count(),
         connection.namespace().server().connection_count()
@@ -38,9 +39,23 @@ async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
     Ok(())
 }
 
+async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
+    println!(
+        "{}: on_connect, sid: {}, ns conns: {}, server conns: {}",
+        connection.namespace().path(),
+        connection.sid(),
+        connection.namespace().connection_count(),
+        connection.namespace().server().connection_count()
+    );
+
+    connection.on_close(on_close).await;
+    Ok(())
+}
+
 async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
     println!(
-        "on_ready, sid: {}, ns conns: {}, server conns: {}",
+        "{}: on_ready, sid: {}, ns conns: {}, server conns: {}",
+        connection.namespace().path(),
         connection.sid(),
         connection.namespace().connection_count(),
         connection.namespace().server().connection_count()
@@ -58,7 +73,6 @@ async fn main() -> Result<()> {
         .new_namespace_builder("/auth")?
         .on_connect(on_connect)
         .on_ready(on_ready)
-        .packet_codec(WsIoPacketCodec::Bincode)
         .with_auth(|_, _: Option<&()>| async { Ok(()) })
         .register()?;
 
@@ -68,6 +82,14 @@ async fn main() -> Result<()> {
         .on_connect(on_connect)
         .on_ready(on_ready)
         .packet_codec(WsIoPacketCodec::Bincode)
+        .register()?;
+
+    // Register /cbor namespace
+    WS_IO_SERVER
+        .new_namespace_builder("/cbor")?
+        .on_connect(on_connect)
+        .on_ready(on_ready)
+        .packet_codec(WsIoPacketCodec::Cbor)
         .register()?;
 
     // Register /msg-pack namespace
@@ -97,7 +119,7 @@ async fn main() -> Result<()> {
     println!("Namespace count: {}", WS_IO_SERVER.namespace_count());
     let ws_io_layer = WS_IO_SERVER.layer();
     let app = Router::new().layer(ws_io_layer);
-    let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+    let listener = TcpListener::bind(("127.0.0.1", 8000)).await?;
     println!("Listening on {}", listener.local_addr().unwrap());
     MAIN_TASK_MANAGER.spawn_with_token(async move |token| {
         println!("Started");
