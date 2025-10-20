@@ -33,12 +33,6 @@ impl WsIoServerNamespace {
     // Protected methods
 
     #[inline]
-    pub(crate) fn cleanup_connection(&self, sid: &str) {
-        self.connections.remove(sid);
-        self.runtime.cleanup_connection(sid);
-    }
-
-    #[inline]
     pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
         let bytes = self.config.packet_codec.encode(packet)?;
         Ok(match self.config.packet_codec.is_text() {
@@ -51,6 +45,12 @@ impl WsIoServerNamespace {
     pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
         self.connections.insert(connection.sid().into(), connection.clone());
         self.runtime.insert_connection(connection);
+    }
+
+    #[inline]
+    pub(crate) fn remove_connection(&self, sid: &str) {
+        self.connections.remove(sid);
+        self.runtime.remove_connection(sid);
     }
 
     // Public methods

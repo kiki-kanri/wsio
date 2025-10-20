@@ -130,7 +130,7 @@ impl WsIoServerConnection {
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.abort_auth_timeout_task().await;
-        self.namespace.cleanup_connection(&self.sid);
+        self.namespace.remove_connection(&self.sid);
         if let Some(on_close_handler) = self.on_close_handler.lock().await.take() {
             let _ = on_close_handler(self.clone()).await;
         }

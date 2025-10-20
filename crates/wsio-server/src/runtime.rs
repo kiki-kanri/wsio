@@ -33,11 +33,6 @@ impl WsIoServerRuntime {
     // Protected methods
 
     #[inline]
-    pub(crate) fn cleanup_connection(&self, sid: &str) {
-        self.connections.remove(sid);
-    }
-
-    #[inline]
     pub(crate) fn connection_count(&self) -> usize {
         self.connections.len()
     }
@@ -69,5 +64,10 @@ impl WsIoServerRuntime {
         }
 
         Ok(WsIoServerNamespaceBuilder::new(path, self.clone()))
+    }
+
+    #[inline]
+    pub(crate) fn remove_connection(&self, sid: &str) {
+        self.connections.remove(sid);
     }
 }
