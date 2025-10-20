@@ -88,7 +88,7 @@ impl WsIoServerConnection {
         )
     }
 
-    // Protected methods
+    // Private methods
     async fn abort_auth_timeout_task(&self) {
         if let Some(auth_timeout_task) = self.auth_timeout_task.lock().await.take() {
             auth_timeout_task.abort();
@@ -127,6 +127,31 @@ impl WsIoServerConnection {
         Ok(())
     }
 
+    async fn handle_auth_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
+        if !matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth) {
+            bail!("Auth packet received when not awaiting auth");
+        }
+
+        if let Some(auth_handler) = &self.namespace.config.auth_handler {
+            (auth_handler)(self.clone(), packet_data).await?;
+            self.abort_auth_timeout_task().await;
+            if !matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth) {
+                bail!("Auth packet received when not awaiting auth");
+            }
+
+            self.activate().await?;
+            return Ok(());
+        }
+
+        bail!("Auth packet received but auth handler is not set");
+    }
+
+    #[inline]
+    fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
+        Ok(self.tx.send(self.namespace.encode_packet_to_message(packet)?)?)
+    }
+
+    // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.abort_auth_timeout_task().await;
@@ -160,23 +185,14 @@ impl WsIoServerConnection {
             Err(_) => return,
         };
 
-        match packet.r#type {
-            WsIoPacketType::Auth => {
-                if let Some(auth_handler) = &self.namespace.config.auth_handler
-                    && (auth_handler)(self.clone(), packet.data.as_deref()).await.is_ok()
-                {
-                    self.abort_auth_timeout_task().await;
-                    if matches!(*self.status.read().await, WsIoServerConnectionStatus::AwaitingAuth)
-                        && self.activate().await.is_ok()
-                    {
-                        return;
-                    }
-                }
-
-                self.close().await;
-            }
-            WsIoPacketType::Event => {}
-            _ => {}
+        if match packet.r#type {
+            WsIoPacketType::Auth => self.handle_auth_packet(packet.data.as_deref()).await,
+            WsIoPacketType::Event => Ok(()),
+            _ => Ok(()),
+        }
+        .is_err()
+        {
+            self.close().await;
         }
     }
 
@@ -184,7 +200,7 @@ impl WsIoServerConnection {
         let require_auth = self.namespace.config.auth_handler.is_some();
         let packet = WsIoPacket {
             data: Some(self.namespace.config.packet_codec.encode_data(&require_auth)?),
-            key: Some(self.sid.clone()),
+            key: None,
             r#type: WsIoPacketType::Init,
         };
 
@@ -208,11 +224,6 @@ impl WsIoServerConnection {
         }
 
         Ok(())
-    }
-
-    #[inline]
-    fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        Ok(self.tx.send(self.namespace.encode_packet_to_message(packet)?)?)
     }
 
     // Public methods
