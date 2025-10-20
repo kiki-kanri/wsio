@@ -24,6 +24,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_tungstenite::tungstenite::Message;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     WsIoServer,
@@ -54,6 +55,7 @@ type OnCloseHandler = Box<
 
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
+    cancel_token: CancellationToken,
     headers: HeaderMap,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
@@ -69,6 +71,7 @@ impl WsIoServerConnection {
         (
             Self {
                 auth_timeout_task: Mutex::new(None),
+                cancel_token: CancellationToken::new(),
                 headers,
                 message_tx,
                 namespace,
@@ -152,6 +155,7 @@ impl WsIoServerConnection {
         *self.status.write().await = WsIoServerConnectionStatus::Closing;
         self.abort_auth_timeout_task().await;
         self.namespace.remove_connection(&self.sid);
+        self.cancel_token.cancel();
         if let Some(on_close_handler) = self.on_close_handler.lock().await.take() {
             let _ = on_close_handler(self.clone()).await;
         }
@@ -221,6 +225,12 @@ impl WsIoServerConnection {
     }
 
     // Public methods
+
+    #[inline]
+    pub fn cancel_token(&self) -> &CancellationToken {
+        &self.cancel_token
+    }
+
     pub async fn disconnect(&self) {
         let _ = self
             .send_packet(&WsIoPacket {
