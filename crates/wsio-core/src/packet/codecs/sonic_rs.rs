@@ -26,7 +26,7 @@ impl WsIoPacketSonicRsCodec {
 
     #[inline]
     pub(super) fn decode_data<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<D> {
-        Ok(from_slice::<D>(bytes)?)
+        Ok(from_slice(bytes)?)
     }
 
     #[inline]

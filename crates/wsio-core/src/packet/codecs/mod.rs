@@ -6,6 +6,8 @@ use serde::{
 
 #[cfg(feature = "packet-codec-bincode")]
 mod bincode;
+#[cfg(feature = "packet-codec-cbor")]
+mod cbor;
 #[cfg(feature = "packet-codec-msgpack")]
 mod msgpack;
 mod serde_json;
@@ -14,6 +16,8 @@ mod sonic_rs;
 
 #[cfg(feature = "packet-codec-bincode")]
 use self::bincode::WsIoPacketBincodeCodec;
+#[cfg(feature = "packet-codec-cbor")]
+use self::cbor::WsIoPacketCborCodec;
 #[cfg(feature = "packet-codec-msgpack")]
 use self::msgpack::WsIoPacketMsgPackCodec;
 use self::serde_json::WsIoPacketSerdeJsonCodec;
@@ -25,6 +29,8 @@ use super::WsIoPacket;
 pub enum WsIoPacketCodec {
     #[cfg(feature = "packet-codec-bincode")]
     Bincode,
+    #[cfg(feature = "packet-codec-cbor")]
+    Cbor,
     #[cfg(feature = "packet-codec-msgpack")]
     MsgPack,
     SerdeJson,
@@ -38,6 +44,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.decode(bytes),
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec.decode(bytes),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.decode(bytes),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode(bytes),
@@ -51,6 +59,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.decode_data(bytes),
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec.decode_data(bytes),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.decode_data(bytes),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode_data(bytes),
@@ -64,6 +74,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.encode(packet.clone()),
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec.encode(&packet),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.encode(packet.clone()),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode(packet),
@@ -77,6 +89,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.empty_data_encoded(),
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec.empty_data_encoded(),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.empty_data_encoded(),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.empty_data_encoded(),
@@ -90,6 +104,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec.encode_data(data),
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec.encode_data(data),
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.encode_data(data),
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode_data(data),
@@ -102,6 +118,8 @@ impl WsIoPacketCodec {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
             Self::Bincode => WsIoPacketBincodeCodec::IS_TEXT,
+            #[cfg(feature = "packet-codec-cbor")]
+            Self::Cbor => WsIoPacketCborCodec::IS_TEXT,
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec::IS_TEXT,
             Self::SerdeJson => WsIoPacketSerdeJsonCodec::IS_TEXT,

@@ -40,7 +40,7 @@ impl WsIoPacketBincodeCodec {
 
     #[inline]
     pub(super) fn decode_data<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<D> {
-        let (data, _) = decode_from_slice::<D, _>(bytes, standard())?;
+        let (data, _) = decode_from_slice(bytes, standard())?;
         Ok(data)
     }
 
