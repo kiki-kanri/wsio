@@ -18,7 +18,7 @@ impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
         Self {
             config: WsIoServerConfig {
-                auth_timeout: Duration::from_secs(5),
+                auth_timeout: Duration::from_secs(3),
                 packet_codec: WsIoPacketCodec::SerdeJson,
                 request_path: "/ws.io".into(),
             },
