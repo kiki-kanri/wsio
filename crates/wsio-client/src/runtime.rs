@@ -105,9 +105,9 @@ impl WsIoClientRuntime {
 
         let (connection, mut message_rx) = WsIoClientConnection::new(self.clone());
         let connection = Arc::new(connection);
+        connection.init().await;
 
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
-
         let connection_clone = connection.clone();
         let read_ws_stream_task = spawn(async move {
             while let Some(message) = ws_stream_reader.next().await {
@@ -135,7 +135,6 @@ impl WsIoClientRuntime {
             }
         });
 
-        connection.init().await;
         *self.connection.write().await = Some(connection.clone());
         select! {
             _ = read_ws_stream_task => {},
