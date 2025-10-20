@@ -45,7 +45,7 @@ impl WsIoClientBuilder {
         D: Serialize,
     {
         let handler = Arc::new(handler);
-        self.config.auth_handler = Some(Arc::new(move |connection| {
+        self.config.auth_handler = Some(Box::new(move |connection| {
             let handler = handler.clone();
             Box::pin(async move {
                 Ok(match handler(connection).await? {

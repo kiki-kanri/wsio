@@ -11,7 +11,7 @@ use crate::{
     core::packet::codecs::WsIoPacketCodec,
 };
 
-type AuthHandler = Arc<
+type AuthHandler = Box<
     dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'static>>
         + Send
         + Sync
