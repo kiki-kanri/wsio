@@ -83,7 +83,7 @@ impl WsIoServerNamespaceBuilder {
             let handler = handler.clone();
             Box::pin(async move {
                 let auth_data = match bytes {
-                    Some(bytes) => Some(self.config.packet_codec.decode_data::<D>(bytes)?),
+                    Some(bytes) => Some(self.config.packet_codec.decode_data(bytes)?),
                     None => None,
                 };
 
