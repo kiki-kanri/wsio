@@ -32,17 +32,18 @@ impl WsIoClientBuilder {
             config: WsIoClientConfig {
                 auth_handler: None,
                 connect_url: namespace_url,
+                on_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
             },
         })
     }
 
     // Public methods
-    pub fn auth<H, Fut, D>(mut self, handler: H) -> WsIoClientBuilder
+    pub fn auth<D, H, Fut>(mut self, handler: H) -> WsIoClientBuilder
     where
+        D: Serialize,
         H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Option<D>>> + Send + 'static,
-        D: Serialize,
     {
         let handler = Arc::new(handler);
         self.config.auth_handler = Some(Box::new(move |connection| {
@@ -60,6 +61,15 @@ impl WsIoClientBuilder {
 
     pub fn build(self) -> WsIoClient {
         WsIoClient(Arc::new(WsIoClientRuntime::new(self.config)))
+    }
+
+    pub fn on_ready<H, Fut>(mut self, handler: H) -> Self
+    where
+        H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.config.on_ready_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
+        self
     }
 
     pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {

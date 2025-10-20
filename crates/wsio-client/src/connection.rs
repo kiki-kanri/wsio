@@ -109,7 +109,7 @@ impl WsIoClientConnection {
         Ok(())
     }
 
-    async fn handle_ready_packet(&self) -> Result<()> {
+    async fn handle_ready_packet(self: &Arc<Self>) -> Result<()> {
         {
             let mut status = self.status.write().await;
             match *status {
@@ -123,7 +123,10 @@ impl WsIoClientConnection {
         }
 
         *self.status.write().await = WsIoClientConnectionStatus::Ready;
-        // TODO: Handle ready
+        if let Some(on_ready_handler) = &self.runtime.config.on_ready_handler {
+            on_ready_handler(self.clone()).await?;
+        }
+
         Ok(())
     }
 
