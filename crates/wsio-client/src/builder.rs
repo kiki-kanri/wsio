@@ -56,10 +56,10 @@ impl WsIoClientBuilder {
         self.config.auth_handler = Some(Box::new(move |connection| {
             let handler = handler.clone();
             Box::pin(async move {
-                Ok(match handler(connection).await? {
-                    Some(data) => Some(self.config.packet_codec.encode_data(&data)?.to_vec()),
-                    None => None,
-                })
+                handler(connection)
+                    .await?
+                    .map(|data| self.config.packet_codec.encode_data(&data))
+                    .transpose()
             })
         }));
 

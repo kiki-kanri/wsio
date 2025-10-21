@@ -82,10 +82,9 @@ impl WsIoServerNamespaceBuilder {
         self.config.auth_handler = Some(Box::new(move |connection, bytes: Option<&[u8]>| {
             let handler = handler.clone();
             Box::pin(async move {
-                let auth_data = match bytes {
-                    Some(bytes) => Some(self.config.packet_codec.decode_data(bytes)?),
-                    None => None,
-                };
+                let auth_data = bytes
+                    .map(|bytes| self.config.packet_codec.decode_data(bytes))
+                    .transpose()?;
 
                 handler(connection, auth_data.as_ref()).await
             })

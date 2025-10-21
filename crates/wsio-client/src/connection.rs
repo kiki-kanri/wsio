@@ -95,8 +95,8 @@ impl WsIoClientConnection {
         if requires_auth {
             if let Some(auth_handler) = &self.runtime.config.auth_handler {
                 self.send_packet(&WsIoPacket {
-                    key: None,
                     data: auth_handler(self.clone()).await?,
+                    key: None,
                     r#type: WsIoPacketType::Auth,
                 })
                 .await?;
