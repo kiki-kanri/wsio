@@ -168,14 +168,10 @@ impl WsIoServerConnection {
     pub(crate) async fn close(&self) {
         {
             let mut status = self.status.write().await;
-            if matches!(
-                *status,
-                WsIoServerConnectionStatus::Closed | WsIoServerConnectionStatus::Closing
-            ) {
-                return;
+            match *status {
+                WsIoServerConnectionStatus::Closed | WsIoServerConnectionStatus::Closing => return,
+                _ => *status = WsIoServerConnectionStatus::Closing,
             }
-
-            *status = WsIoServerConnectionStatus::Closing;
         }
 
         let _ = self.message_tx.send(Message::Close(None)).await;

@@ -157,14 +157,10 @@ impl WsIoClientConnection {
     pub(crate) async fn close(&self) {
         {
             let mut status = self.status.write().await;
-            if matches!(
-                *status,
-                WsIoClientConnectionStatus::Closed | WsIoClientConnectionStatus::Closing
-            ) {
-                return;
+            match *status {
+                WsIoClientConnectionStatus::Closed | WsIoClientConnectionStatus::Closing => return,
+                _ => *status = WsIoClientConnectionStatus::Closing,
             }
-
-            *status = WsIoClientConnectionStatus::Closing;
         }
 
         let _ = self.message_tx.send(Message::Close(None)).await;
