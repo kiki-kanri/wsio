@@ -66,6 +66,11 @@ impl WsIoClientConnection {
     }
 
     // Private methods
+    async fn handle_disconnect_packet(&self) -> Result<()> {
+        let _ = self.runtime.disconnect().await;
+        Ok(())
+    }
+
     async fn handle_init_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
         {
             let mut status = self.status.write().await;
@@ -169,6 +174,7 @@ impl WsIoClientConnection {
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
         let packet = self.runtime.config.packet_codec.decode(bytes)?;
         match packet.r#type {
+            WsIoPacketType::Disconnect => self.handle_disconnect_packet().await,
             WsIoPacketType::Init => {
                 if let Some(packet_data) = packet.data.as_deref() {
                     self.handle_init_packet(packet_data).await
