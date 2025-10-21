@@ -1,8 +1,11 @@
-use std::sync::{
-    Arc,
-    LazyLock,
+use std::{
+    process::id,
+    sync::{
+        Arc,
+        LazyLock,
+    },
 };
-use std::process::id;
+
 use anyhow::Result;
 use axum::{
     Router,

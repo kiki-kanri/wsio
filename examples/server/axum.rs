@@ -1,5 +1,8 @@
-use std::sync::LazyLock;
-use std::process::id;
+use std::{
+    process::id,
+    sync::LazyLock,
+};
+
 use anyhow::Result;
 use axum::{
     Router,
