@@ -73,10 +73,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         None => return respond(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    namespace
-        .runtime
-        .handle_on_upgrade_request(request.headers().clone(), namespace.clone(), on_upgrade);
-
+    namespace.handle_on_upgrade_request(request.headers().clone(), namespace.clone(), on_upgrade);
     Ok(Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)
         .header(header::CONNECTION, "Upgrade")
