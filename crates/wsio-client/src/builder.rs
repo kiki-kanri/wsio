@@ -28,8 +28,8 @@ impl WsIoClientBuilder {
             bail!("Invalid URL scheme: {}", url.scheme());
         }
 
-        let namespace = url.path();
-        url.set_query(Some(&format!("namespace={}", namespace)));
+        let namespace = url.path().trim_matches('/');
+        url.set_query(Some(&format!("namespace=/{}", namespace)));
         url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
