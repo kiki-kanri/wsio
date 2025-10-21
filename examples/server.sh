@@ -1,3 +1,9 @@
 #!/bin/bash
 
-cargo r -p wsio-server --example server --all-features "${@}"
+set -euo pipefail
+
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+cd "${SCRIPTS_DIR}"
+
+cd server/
+cargo r --bin server --all-features "${@}"

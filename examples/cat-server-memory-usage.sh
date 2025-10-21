@@ -1,9 +1,9 @@
 #!/bin/bash
 
 while true; do
-    pid=$(pgrep -f "target/debug/examples/server")
+    pid=$(pgrep -f 'examples/target/debug/server')
     if [ -z "$pid" ]; then
-        pid=$(pgrep -f "target/release/examples/server")
+        pid=$(pgrep -f 'examples/target/release/server')
     fi
 
     if [ -n "$pid" ]; then
