@@ -21,11 +21,11 @@ use tokio::{
 };
 use tokio_tungstenite::{
     WebSocketStream,
-    tungstenite::protocol::Role,
-};
-use tungstenite::{
-    Message,
-    handshake::derive_accept_key,
+    tungstenite::{
+        Message,
+        handshake::derive_accept_key,
+        protocol::Role,
+    },
 };
 use url::form_urlencoded;
 
@@ -96,10 +96,16 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     let headers = request.headers().clone();
     spawn(async move {
         if let Ok(upgraded) = on_upgrade.await {
-            let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace);
+            let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace.clone());
             let connection = Arc::new(connection);
 
-            let ws_stream = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
+            let ws_stream = WebSocketStream::from_raw_socket(
+                TokioIo::new(upgraded),
+                Role::Server,
+                Some(namespace.config.websocket_config),
+            )
+            .await;
+
             let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
 
             let connection_clone = connection.clone();

@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use url::Url;
 
 use crate::{
@@ -35,4 +36,5 @@ pub(crate) struct WsIoClientConfig {
     pub(crate) packet_codec: WsIoPacketCodec,
     pub(crate) reconnection_delay: Duration,
     pub(crate) ready_timeout: Duration,
+    pub(crate) websocket_config: WebSocketConfig,
 }

@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use serde::de::DeserializeOwned;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use super::{
     WsIoServerNamespace,
@@ -32,6 +33,7 @@ impl WsIoServerNamespaceBuilder {
                 on_ready_handler: None,
                 packet_codec: runtime.config.packet_codec,
                 path: path.into(),
+                websocket_config: runtime.config.websocket_config,
             },
             runtime,
         }
@@ -70,6 +72,16 @@ impl WsIoServerNamespaceBuilder {
         let namespace = Arc::new(WsIoServerNamespace::new(self.config, self.runtime.clone()));
         self.runtime.insert_namespace(namespace.clone())?;
         Ok(namespace)
+    }
+
+    pub fn websocket_config(mut self, websocket_config: WebSocketConfig) -> Self {
+        self.config.websocket_config = websocket_config;
+        self
+    }
+
+    pub fn websocket_config_mut<F: FnOnce(&mut WebSocketConfig)>(mut self, f: F) -> Self {
+        f(&mut self.config.websocket_config);
+        self
     }
 
     pub fn with_auth<H, Fut, D>(mut self, handler: H) -> Self

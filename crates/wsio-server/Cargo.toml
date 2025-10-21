@@ -31,7 +31,6 @@ tokio-tungstenite = { version = "0.28.0", default-features = false }
 tokio-util = "0.7.16"
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
-tungstenite = "0.28.0"
 wsio-core = { path = "../wsio-core", version = "0.3.0" }
 url = "2.5.7"
 
@@ -47,7 +46,7 @@ all = [
   "packet-codec-bincode",
   "packet-codec-cbor",
   "packet-codec-msgpack",
-  "packet-codec-sonic-rs"
+  "packet-codec-sonic-rs",
 ]
 
 full = ["all"]

@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::{
     connection::WsIoServerConnection,
@@ -33,4 +34,5 @@ pub(crate) struct WsIoServerNamespaceConfig {
     pub(crate) on_ready_handler: Option<OnlyConnectionParamHandler>,
     pub(crate) packet_codec: WsIoPacketCodec,
     pub(super) path: String,
+    pub(crate) websocket_config: WebSocketConfig,
 }

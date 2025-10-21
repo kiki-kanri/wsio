@@ -19,7 +19,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_tungstenite::{
-    connect_async,
+    connect_async_with_config,
     tungstenite::Message,
 };
 
@@ -101,7 +101,12 @@ impl WsIoClientRuntime {
     }
 
     pub(crate) async fn run_connection(self: &Arc<Self>) -> Result<()> {
-        let (ws_stream, _) = connect_async(self.config.connect_url.as_str()).await?;
+        let (ws_stream, _) = connect_async_with_config(
+            self.config.connect_url.as_str(),
+            Some(self.config.websocket_config),
+            false,
+        )
+        .await?;
 
         let (connection, mut message_rx) = WsIoClientConnection::new(self.clone());
         let connection = Arc::new(connection);
