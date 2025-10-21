@@ -4,7 +4,7 @@ use anyhow::{
     Result,
     bail,
 };
-use futures::{
+use futures_util::{
     SinkExt,
     StreamExt,
 };

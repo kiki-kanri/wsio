@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{
+use futures_util::{
     SinkExt,
     StreamExt,
 };
