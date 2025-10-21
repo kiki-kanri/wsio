@@ -24,5 +24,5 @@ Since development is not yet complete, documentation is currently unavailable. H
 - dashmap or hashmap
 - sync or async lock
 - check errors and efficacy
-- memory usage per connection
 - docs
+- extract and merge duplicate code
