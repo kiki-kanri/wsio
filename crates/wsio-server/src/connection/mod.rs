@@ -28,6 +28,11 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
+#[cfg(feature = "connection-extensions")]
+mod extensions;
+
+#[cfg(feature = "connection-extensions")]
+use self::extensions::WsIoServerConnectionExtensions;
 use crate::{
     WsIoServer,
     core::packet::{
@@ -58,6 +63,8 @@ type OnCloseHandler = Box<
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: CancellationToken,
+    #[cfg(feature = "connection-extensions")]
+    extensions: WsIoServerConnectionExtensions,
     headers: HeaderMap,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
@@ -74,6 +81,8 @@ impl WsIoServerConnection {
             Self {
                 auth_timeout_task: Mutex::new(None),
                 cancel_token: CancellationToken::new(),
+                #[cfg(feature = "connection-extensions")]
+                extensions: WsIoServerConnectionExtensions::new(),
                 headers,
                 message_tx,
                 namespace,
@@ -236,6 +245,12 @@ impl WsIoServerConnection {
             r#type: WsIoPacketType::Event,
         })
         .await
+    }
+
+    #[cfg(feature = "connection-extensions")]
+    #[inline]
+    pub fn extensions(&self) -> &WsIoServerConnectionExtensions {
+        &self.extensions
     }
 
     #[inline]

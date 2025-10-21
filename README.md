@@ -13,8 +13,8 @@ Since development is not yet complete, documentation is currently unavailable. H
 ## TODO
 
 - server.close
-- connection.state or connection.extensions
 - server emit
+- namespace emit
 - server on/off handlers and multiple handlers of same event
 - client emit and buffer
 - client on/off handlers and multiple handlers of same event
