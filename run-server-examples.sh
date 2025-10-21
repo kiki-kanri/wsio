@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cargo r -p wsio-server --example main --all-features "${@}"
+cargo r -p wsio-server --example server --all-features "${@}"
