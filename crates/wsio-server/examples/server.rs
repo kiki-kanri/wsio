@@ -20,7 +20,7 @@ use wsio_server::{
     core::packet::codecs::WsIoPacketCodec,
 };
 
-// Constants
+// Constants/Statics
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 static MAIN_TASK_MANAGER: LazyLock<TaskManager> = LazyLock::new(TaskManager::new);
@@ -92,9 +92,18 @@ async fn main() -> Result<()> {
         .packet_codec(WsIoPacketCodec::Cbor)
         .register()?;
 
-    // Register /msg-pack namespace
+    // Register /disconnect namespace
     WS_IO_SERVER
-        .new_namespace_builder("/msg-pack")?
+        .new_namespace_builder("/disconnect")?
+        .on_ready(|connection| async move {
+            connection.disconnect().await;
+            Ok(())
+        })
+        .register()?;
+
+    // Register /msgpack namespace
+    WS_IO_SERVER
+        .new_namespace_builder("/msgpack")?
         .on_connect(on_connect)
         .on_ready(on_ready)
         .packet_codec(WsIoPacketCodec::MsgPack)

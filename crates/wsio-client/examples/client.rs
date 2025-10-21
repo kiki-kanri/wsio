@@ -14,55 +14,70 @@ use wsio_client::{
 
 // Constants/Statics
 static AUTH: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/auth")
+    const NAMESPACE: &str = "/auth";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
         .auth::<&(), _, _>(|_| async { Ok(None) })
-        .on_connection_close(|connection| on_connection_close(connection, "/auth"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/auth"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .build()
 });
 
 static BINCODE: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/bincode")
+    const NAMESPACE: &str = "/bincode";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, "/bincode"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/bincode"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .packet_codec(WsIoPacketCodec::Bincode)
         .build()
 });
 
 static CBOR: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/cbor")
+    const NAMESPACE: &str = "/cbor";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, "/cbor"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/cbor"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .packet_codec(WsIoPacketCodec::Cbor)
         .build()
 });
 
-static MSG_PACK: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/msg-pack")
+static DISCONNECT: LazyLock<WsIoClient> = LazyLock::new(|| {
+    const NAMESPACE: &str = "/disconnect";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, "/msg-pack"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/msg-pack"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .build()
+});
+
+static MSG_PACK: LazyLock<WsIoClient> = LazyLock::new(|| {
+    const NAMESPACE: &str = "/msgpack";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
+        .unwrap()
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .packet_codec(WsIoPacketCodec::MsgPack)
         .build()
 });
 
 static SERDE_JSON: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/serde-json")
+    const NAMESPACE: &str = "/serde-json";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, "/serde-json"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/serde-json"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .packet_codec(WsIoPacketCodec::SerdeJson)
         .build()
 });
 
 static SONIC_RS: LazyLock<WsIoClient> = LazyLock::new(|| {
-    WsIoClient::builder("ws://127.0.0.1:8000/sonic-rs")
+    const NAMESPACE: &str = "/sonic-rs";
+    WsIoClient::builder(format!("ws://127.0.0.1:8000/{}", NAMESPACE).as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, "/sonic-rs"))
-        .on_connection_ready(|connection| on_connection_ready(connection, "/sonic-rs"))
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .packet_codec(WsIoPacketCodec::SonicRs)
         .build()
 });
@@ -84,6 +99,7 @@ async fn main() -> Result<()> {
         AUTH.connect(),
         BINCODE.connect(),
         CBOR.connect(),
+        DISCONNECT.connect(),
         MSG_PACK.connect(),
         SERDE_JSON.connect(),
         SONIC_RS.connect(),
@@ -94,6 +110,7 @@ async fn main() -> Result<()> {
         AUTH.disconnect(),
         BINCODE.disconnect(),
         CBOR.disconnect(),
+        DISCONNECT.disconnect(),
         MSG_PACK.disconnect(),
         SERDE_JSON.disconnect(),
         SONIC_RS.disconnect(),
