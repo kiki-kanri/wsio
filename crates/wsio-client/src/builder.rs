@@ -28,7 +28,25 @@ impl WsIoClientBuilder {
             bail!("Invalid URL scheme: {}", url.scheme());
         }
 
-        let namespace = url.path().trim_matches('/');
+        let namespace = {
+            let path = url.path().trim_matches('/');
+            let mut normalized = String::new();
+            let mut last_slash = false;
+            for char in path.chars() {
+                if char == '/' {
+                    if !last_slash {
+                        normalized.push('/');
+                        last_slash = true;
+                    }
+                } else {
+                    normalized.push(char);
+                    last_slash = false;
+                }
+            }
+
+            normalized
+        };
+
         url.set_query(Some(&format!("namespace=/{}", namespace)));
         url.set_path("ws.io");
         Ok(Self {
