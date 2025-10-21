@@ -9,6 +9,7 @@ use anyhow::{
 };
 use bson::oid::ObjectId;
 use http::HeaderMap;
+use serde::Serialize;
 use tokio::{
     select,
     spawn,
@@ -233,6 +234,17 @@ impl WsIoServerConnection {
             .await;
 
         self.close().await
+    }
+
+    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
+        self.send_packet(&WsIoPacket {
+            data: data
+                .map(|data| self.namespace.config.packet_codec.encode_data(data))
+                .transpose()?,
+            key: Some(event.as_ref().to_string()),
+            r#type: WsIoPacketType::Event,
+        })
+        .await
     }
 
     #[inline]
