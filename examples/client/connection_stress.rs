@@ -33,14 +33,14 @@ async fn main() -> Result<()> {
             drop(permit);
 
             if i % 1000 == 0 {
-                println!("connected {}", i);
+                println!("connected {i}");
             }
 
             sleep(Duration::from_secs(10)).await;
             let _ = client.disconnect().await;
 
             if i % 1000 == 0 {
-                println!("disconnected {}", i);
+                println!("disconnected {i}");
             }
         }));
     }

@@ -47,7 +47,7 @@ impl WsIoClientBuilder {
             normalized
         };
 
-        url.set_query(Some(&format!("namespace=/{}", namespace)));
+        url.set_query(Some(&format!("namespace=/{namespace}")));
         url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {

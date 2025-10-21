@@ -28,7 +28,7 @@ impl WsIoClient {
     {
         let url = match url.try_into() {
             Ok(url) => url,
-            Err(e) => panic!("Invalid URL: {}", e),
+            Err(e) => panic!("Invalid URL: {e}"),
         };
 
         WsIoClientBuilder::new(url)

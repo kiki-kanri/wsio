@@ -2,7 +2,7 @@ use std::sync::{
     Arc,
     LazyLock,
 };
-
+use std::process::id;
 use anyhow::Result;
 use axum::{
     Router,
@@ -66,7 +66,7 @@ async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("pid: {}", std::process::id());
+    println!("pid: {}", id());
 
     // Register /auth namespace
     WS_IO_SERVER

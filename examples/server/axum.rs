@@ -1,5 +1,5 @@
 use std::sync::LazyLock;
-
+use std::process::id;
 use anyhow::Result;
 use axum::{
     Router,
@@ -21,7 +21,7 @@ static WS_IO_SERVER: LazyLock<WsIoServer> = LazyLock::new(|| WsIoServer::builder
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("pid: {}", std::process::id());
+    println!("pid: {}", id());
 
     let ws_io_layer = WS_IO_SERVER.layer();
 
