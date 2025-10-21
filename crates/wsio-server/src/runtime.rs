@@ -39,7 +39,7 @@ impl WsIoServerRuntime {
 
     #[inline]
     pub(crate) fn get_namespace(&self, path: &str) -> Option<Arc<WsIoServerNamespace>> {
-        self.namespaces.get(path).map(|v| v.clone())
+        self.namespaces.get(path).map(|entry| entry.clone())
     }
 
     #[inline]

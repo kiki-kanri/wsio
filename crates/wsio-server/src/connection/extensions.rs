@@ -33,7 +33,7 @@ impl WsIoServerConnectionExtensions {
     pub fn get<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         self.inner
             .get(&TypeId::of::<T>())
-            .and_then(|kv| kv.clone().downcast().ok())
+            .and_then(|entry| entry.clone().downcast().ok())
     }
 
     #[inline]

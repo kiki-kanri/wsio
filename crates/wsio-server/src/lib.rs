@@ -40,6 +40,11 @@ impl WsIoServer {
     }
 
     #[inline]
+    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
+        self.0.get_namespace(path.as_ref())
+    }
+
+    #[inline]
     pub fn namespace_count(&self) -> usize {
         self.0.namespace_count()
     }
@@ -47,10 +52,5 @@ impl WsIoServer {
     #[inline]
     pub fn new_namespace_builder(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
         self.0.new_namespace_builder(path.as_ref())
-    }
-
-    #[inline]
-    pub fn of(&self, path: impl AsRef<str>) -> Option<Arc<WsIoServerNamespace>> {
-        self.0.get_namespace(path.as_ref())
     }
 }

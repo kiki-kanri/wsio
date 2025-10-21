@@ -39,7 +39,7 @@ pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
     connections: DashMap<String, Arc<WsIoServerConnection>>,
     connection_tasks: DashMap<String, JoinHandle<()>>,
-    pub(crate) runtime: Arc<WsIoServerRuntime>,
+    runtime: Arc<WsIoServerRuntime>,
 }
 
 impl WsIoServerNamespace {
