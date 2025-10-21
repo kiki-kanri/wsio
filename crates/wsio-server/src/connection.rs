@@ -10,6 +10,7 @@ use anyhow::{
 use bson::oid::ObjectId;
 use http::HeaderMap;
 use tokio::{
+    select,
     spawn,
     sync::{
         Mutex,
@@ -260,5 +261,16 @@ impl WsIoServerConnection {
     #[inline]
     pub fn sid(&self) -> &str {
         &self.sid
+    }
+
+    #[inline]
+    pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
+        let cancel_token = self.cancel_token().clone();
+        spawn(async move {
+            select! {
+                _ = cancel_token.cancelled() => {},
+                _ = future => {},
+            }
+        });
     }
 }
