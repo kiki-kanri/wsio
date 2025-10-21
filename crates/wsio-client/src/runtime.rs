@@ -44,13 +44,13 @@ pub(crate) struct WsIoClientRuntime {
 }
 
 impl WsIoClientRuntime {
-    pub(crate) fn new(config: WsIoClientConfig) -> Self {
-        Self {
+    pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
+        Arc::new(Self {
             config,
             connection: RwLock::new(None),
             connection_loop_task: Mutex::new(None),
             status: RwLock::new(WsIoClientRuntimeStatus::Stopped),
-        }
+        })
     }
 
     // Protected methods
@@ -109,7 +109,6 @@ impl WsIoClientRuntime {
         .await?;
 
         let (connection, mut message_rx) = WsIoClientConnection::new(self.clone());
-        let connection = Arc::new(connection);
         connection.init().await;
 
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();

@@ -50,17 +50,17 @@ pub struct WsIoClientConnection {
 }
 
 impl WsIoClientConnection {
-    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Self, Receiver<Message>) {
+    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
         // TODO: use config set buf size
         let (message_tx, message_rx) = channel(512);
         (
-            Self {
+            Arc::new(Self {
                 init_timeout_task: Mutex::new(None),
                 message_tx,
                 ready_timeout_task: Mutex::new(None),
                 runtime,
                 status: RwLock::new(ConnectionStatus::Created),
-            },
+            }),
             message_rx,
         )
     }

@@ -92,7 +92,7 @@ impl WsIoClientBuilder {
     }
 
     pub fn build(self) -> WsIoClient {
-        WsIoClient(Arc::new(WsIoClientRuntime::new(self.config)))
+        WsIoClient(WsIoClientRuntime::new(self.config))
     }
 
     pub fn init_timeout(mut self, duration: Duration) -> Self {

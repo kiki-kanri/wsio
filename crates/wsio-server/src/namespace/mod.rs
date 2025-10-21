@@ -22,12 +22,12 @@ pub struct WsIoServerNamespace {
 }
 
 impl WsIoServerNamespace {
-    fn new(config: WsIoServerNamespaceConfig, runtime: Arc<WsIoServerRuntime>) -> Self {
-        Self {
+    fn new(config: WsIoServerNamespaceConfig, runtime: Arc<WsIoServerRuntime>) -> Arc<Self> {
+        Arc::new(Self {
             config,
             connections: DashMap::new(),
             runtime,
-        }
+        })
     }
 
     // Protected methods

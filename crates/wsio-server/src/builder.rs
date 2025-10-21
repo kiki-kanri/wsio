@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::time::Duration;
 
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
@@ -35,7 +32,7 @@ impl WsIoServerBuilder {
 
     // Public methods
     pub fn build(self) -> WsIoServer {
-        WsIoServer(Arc::new(WsIoServerRuntime::new(self.config)))
+        WsIoServer(WsIoServerRuntime::new(self.config))
     }
 
     pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
