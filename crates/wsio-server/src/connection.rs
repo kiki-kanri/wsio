@@ -38,7 +38,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-enum WsIoServerConnectionStatus {
+enum ConnectionStatus {
     Activating,
     Authenticating,
     AwaitingAuth,
@@ -63,7 +63,7 @@ pub struct WsIoServerConnection {
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<OnCloseHandler>>,
     sid: String,
-    status: RwLock<WsIoServerConnectionStatus>,
+    status: RwLock<ConnectionStatus>,
 }
 
 impl WsIoServerConnection {
@@ -79,7 +79,7 @@ impl WsIoServerConnection {
                 namespace,
                 on_close_handler: Mutex::new(None),
                 sid: ObjectId::new().to_string(),
-                status: RwLock::new(WsIoServerConnectionStatus::Created),
+                status: RwLock::new(ConnectionStatus::Created),
             },
             message_rx,
         )
@@ -96,9 +96,7 @@ impl WsIoServerConnection {
         {
             let mut status = self.status.write().await;
             match *status {
-                WsIoServerConnectionStatus::Authenticating | WsIoServerConnectionStatus::Created => {
-                    *status = WsIoServerConnectionStatus::Activating
-                }
+                ConnectionStatus::Authenticating | ConnectionStatus::Created => *status = ConnectionStatus::Activating,
                 _ => bail!("Cannot activate connection in invalid status: {:#?}", *status),
             }
         }
@@ -119,7 +117,7 @@ impl WsIoServerConnection {
         })
         .await?;
 
-        *self.status.write().await = WsIoServerConnectionStatus::Ready;
+        *self.status.write().await = ConnectionStatus::Ready;
         if let Some(on_ready_handler) = &self.namespace.config.on_ready_handler {
             on_ready_handler(self.clone()).await?;
         }
@@ -131,7 +129,7 @@ impl WsIoServerConnection {
         {
             let mut status = self.status.write().await;
             match *status {
-                WsIoServerConnectionStatus::AwaitingAuth => *status = WsIoServerConnectionStatus::Authenticating,
+                ConnectionStatus::AwaitingAuth => *status = ConnectionStatus::Authenticating,
                 _ => bail!("Received auth packet in invalid status: {:#?}", *status),
             }
         }
@@ -154,7 +152,7 @@ impl WsIoServerConnection {
 
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
-        *self.status.write().await = WsIoServerConnectionStatus::Closing;
+        *self.status.write().await = ConnectionStatus::Closing;
         self.abort_auth_timeout_task().await;
         self.namespace.remove_connection(&self.sid);
         self.cancel_token.cancel();
@@ -162,15 +160,15 @@ impl WsIoServerConnection {
             let _ = on_close_handler(self.clone()).await;
         }
 
-        *self.status.write().await = WsIoServerConnectionStatus::Closed;
+        *self.status.write().await = ConnectionStatus::Closed;
     }
 
     pub(crate) async fn close(&self) {
         {
             let mut status = self.status.write().await;
             match *status {
-                WsIoServerConnectionStatus::Closed | WsIoServerConnectionStatus::Closing => return,
-                _ => *status = WsIoServerConnectionStatus::Closing,
+                ConnectionStatus::Closed | ConnectionStatus::Closing => return,
+                _ => *status = ConnectionStatus::Closing,
             }
         }
 
@@ -194,14 +192,11 @@ impl WsIoServerConnection {
         };
 
         if require_auth {
-            *self.status.write().await = WsIoServerConnectionStatus::AwaitingAuth;
+            *self.status.write().await = ConnectionStatus::AwaitingAuth;
             let connection = self.clone();
             *self.auth_timeout_task.lock().await = Some(spawn(async move {
                 sleep(connection.namespace.config.auth_timeout).await;
-                if matches!(
-                    *connection.status.read().await,
-                    WsIoServerConnectionStatus::AwaitingAuth
-                ) {
+                if matches!(*connection.status.read().await, ConnectionStatus::AwaitingAuth) {
                     connection.close().await;
                 }
             }));
