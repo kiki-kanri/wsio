@@ -7,7 +7,6 @@ use anyhow::{
     Result,
     bail,
 };
-use bson::oid::ObjectId;
 use http::HeaderMap;
 use serde::Serialize;
 use tokio::{
@@ -74,11 +73,15 @@ pub struct WsIoServerConnection {
 }
 
 impl WsIoServerConnection {
-    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Self, Receiver<Message>) {
+    pub(crate) fn new(
+        headers: HeaderMap,
+        namespace: Arc<WsIoServerNamespace>,
+        sid: String,
+    ) -> (Arc<Self>, Receiver<Message>) {
         // TODO: use config set buf size
         let (message_tx, message_rx) = channel(512);
         (
-            Self {
+            Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
                 cancel_token: CancellationToken::new(),
                 #[cfg(feature = "connection-extensions")]
@@ -87,9 +90,9 @@ impl WsIoServerConnection {
                 message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),
-                sid: ObjectId::new().to_string(),
+                sid,
                 status: RwLock::new(ConnectionStatus::Created),
-            },
+            }),
             message_rx,
         )
     }

@@ -18,7 +18,7 @@ use crate::{
 pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
     connections: DashMap<String, Arc<WsIoServerConnection>>,
-    runtime: Arc<WsIoServerRuntime>,
+    pub(crate) runtime: Arc<WsIoServerRuntime>,
 }
 
 impl WsIoServerNamespace {

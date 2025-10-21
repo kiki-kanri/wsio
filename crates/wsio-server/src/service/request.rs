@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use futures_util::{
-    SinkExt,
-    StreamExt,
-};
 use http::{
     HeaderName,
     Method,
@@ -13,26 +9,10 @@ use http::{
     header,
 };
 use hyper::upgrade::OnUpgrade;
-use hyper_util::rt::TokioIo;
-use tokio::{
-    join,
-    select,
-    spawn,
-};
-use tokio_tungstenite::{
-    WebSocketStream,
-    tungstenite::{
-        Message,
-        handshake::derive_accept_key,
-        protocol::Role,
-    },
-};
+use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
 use url::form_urlencoded;
 
-use crate::{
-    connection::WsIoServerConnection,
-    runtime::WsIoServerRuntime,
-};
+use crate::runtime::WsIoServerRuntime;
 
 #[inline]
 fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &str) -> bool {
@@ -93,69 +73,9 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         None => return respond(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    let headers = request.headers().clone();
-    spawn(async move {
-        if let Ok(upgraded) = on_upgrade.await {
-            let (connection, mut message_rx) = WsIoServerConnection::new(headers, namespace.clone());
-            let connection = Arc::new(connection);
-
-            let ws_stream = WebSocketStream::from_raw_socket(
-                TokioIo::new(upgraded),
-                Role::Server,
-                Some(namespace.config.websocket_config),
-            )
-            .await;
-
-            let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
-
-            let connection_clone = connection.clone();
-            let read_ws_stream_task = spawn(async move {
-                while let Some(message) = ws_stream_reader.next().await {
-                    if match message {
-                        Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
-                        Ok(Message::Close(_)) => break,
-                        Ok(Message::Text(text)) => connection_clone.handle_incoming_packet(text.as_bytes()).await,
-                        Err(_) => break,
-                        _ => Ok(()),
-                    }
-                    .is_err()
-                    {
-                        break;
-                    }
-                }
-            });
-
-            let write_ws_stream_task = spawn(async move {
-                while let Some(message) = message_rx.recv().await {
-                    let is_close = matches!(message, Message::Close(_));
-                    if ws_stream_writer.send(message).await.is_err() {
-                        break;
-                    }
-
-                    if is_close {
-                        let _ = ws_stream_writer.flush().await;
-                        break;
-                    }
-                }
-            });
-
-            match connection.init().await {
-                Ok(_) => {
-                    select! {
-                        _ = read_ws_stream_task => {},
-                        _ = write_ws_stream_task => {},
-                    }
-                }
-                Err(_) => {
-                    connection.close().await;
-                    read_ws_stream_task.abort();
-                    let _ = join!(read_ws_stream_task, write_ws_stream_task);
-                }
-            }
-
-            connection.cleanup().await;
-        }
-    });
+    namespace
+        .runtime
+        .handle_on_upgrade_request(request.headers().clone(), namespace.clone(), on_upgrade);
 
     Ok(Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)
