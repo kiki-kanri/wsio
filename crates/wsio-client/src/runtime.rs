@@ -16,7 +16,10 @@ use num_enum::{
 use tokio::{
     select,
     spawn,
-    sync::Mutex,
+    sync::{
+        Mutex,
+        Notify,
+    },
     task::JoinHandle,
     time::sleep,
 };
@@ -44,6 +47,7 @@ enum WsIoClientRuntimeStatus {
 }
 
 pub(crate) struct WsIoClientRuntime {
+    break_run_connection_loop_notify: ArcSwapOption<Notify>,
     pub(crate) config: WsIoClientConfig,
     connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
@@ -54,6 +58,7 @@ pub(crate) struct WsIoClientRuntime {
 impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
         Arc::new(Self {
+            break_run_connection_loop_notify: ArcSwapOption::new(None),
             config,
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
@@ -74,8 +79,12 @@ impl WsIoClientRuntime {
             WsIoClientRuntimeStatus::Stopping => bail!("Client is stopping"),
         }
 
+        let break_notify = Arc::new(Notify::new());
+        self.break_run_connection_loop_notify.store(Some(break_notify.clone()));
         let runtime = self.clone();
-        *self.connection_loop_task.lock().await = Some(spawn(async move { runtime.run_connection_loop().await }));
+        *self.connection_loop_task.lock().await =
+            Some(spawn(async move { runtime.run_connection_loop(break_notify).await }));
+
         Ok(())
     }
 
@@ -88,6 +97,10 @@ impl WsIoClientRuntime {
             WsIoClientRuntimeStatus::Stopped | WsIoClientRuntimeStatus::Stopping => return Ok(()),
             WsIoClientRuntimeStatus::Running => self.status.store(WsIoClientRuntimeStatus::Stopping),
             WsIoClientRuntimeStatus::Starting => bail!("Client is starting"),
+        }
+
+        if let Some(break_run_connection_loop_notify) = self.break_run_connection_loop_notify.load_full() {
+            break_run_connection_loop_notify.notify_one();
         }
 
         if let Some(connection) = self.connection.load_full() {
@@ -165,7 +178,7 @@ impl WsIoClientRuntime {
         Ok(())
     }
 
-    pub(crate) async fn run_connection_loop(self: &Arc<Self>) {
+    pub(crate) async fn run_connection_loop(self: &Arc<Self>, break_notify: Arc<Notify>) {
         loop {
             match self.status.get() {
                 WsIoClientRuntimeStatus::Running => {}
@@ -175,7 +188,10 @@ impl WsIoClientRuntime {
 
             let _ = self.run_connection().await;
             if matches!(self.status.get(), WsIoClientRuntimeStatus::Running) {
-                sleep(self.config.reconnection_delay).await;
+                select! {
+                    _ = sleep(self.config.reconnection_delay) => {},
+                    _ = break_notify.notified() => {},
+                }
             } else {
                 break;
             }
