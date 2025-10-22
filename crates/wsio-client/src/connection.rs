@@ -131,8 +131,9 @@ impl WsIoClientConnection {
         }
 
         self.status.store(ConnectionStatus::Ready);
-        if let Some(on_connection_ready_handler) = &self.runtime.config.on_connection_ready_handler {
-            on_connection_ready_handler(self.clone()).await?;
+        if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
+            let connection = self.clone();
+            self.spawn_task(async move { on_connection_ready_handler(connection).await });
         }
 
         Ok(())
