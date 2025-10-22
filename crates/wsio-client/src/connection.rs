@@ -10,6 +10,7 @@ use num_enum::{
     TryFromPrimitive,
 };
 use tokio::{
+    select,
     spawn,
     sync::{
         Mutex,
@@ -23,6 +24,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_tungstenite::tungstenite::Message;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     core::{
@@ -49,6 +51,7 @@ enum ConnectionStatus {
 }
 
 pub struct WsIoClientConnection {
+    cancel_token: CancellationToken,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
     message_tx: Sender<Message>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
@@ -62,6 +65,7 @@ impl WsIoClientConnection {
         let (message_tx, message_rx) = channel(512);
         (
             Arc::new(Self {
+                cancel_token: CancellationToken::new(),
                 init_timeout_task: Mutex::new(None),
                 message_tx,
                 ready_timeout_task: Mutex::new(None),
@@ -152,6 +156,7 @@ impl WsIoClientConnection {
             ready_timeout_task.abort();
         }
 
+        self.cancel_token.cancel();
         if let Some(on_connection_close_handler) = &self.runtime.config.on_connection_close_handler {
             let _ = on_connection_close_handler(self.clone()).await;
         }
@@ -193,5 +198,23 @@ impl WsIoClientConnection {
                 connection.close().await;
             }
         }));
+    }
+
+    // Public methods
+
+    #[inline]
+    pub fn cancel_token(&self) -> &CancellationToken {
+        &self.cancel_token
+    }
+
+    #[inline]
+    pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
+        let cancel_token = self.cancel_token.clone();
+        spawn(async move {
+            select! {
+                _ = cancel_token.cancelled() => {},
+                _ = future => {},
+            }
+        });
     }
 }
