@@ -21,8 +21,6 @@ Since development is not yet complete, documentation is currently unavailable. H
 - rooms
 - to rooms and emit
 - broadcast
-- dashmap or hashmap
-- sync or async lock
 - check errors and efficacy
 - docs
 - extract and merge duplicate code
