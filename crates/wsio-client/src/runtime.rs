@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{
-    Result,
-    bail,
-};
+use anyhow::Result;
 use arc_swap::ArcSwapOption;
 use futures_util::{
     SinkExt,
@@ -41,7 +38,6 @@ use crate::{
 #[derive(Debug, IntoPrimitive, TryFromPrimitive)]
 enum RuntimeStatus {
     Running,
-    Starting,
     Stopped,
     Stopping,
 }
@@ -72,11 +68,10 @@ impl WsIoClientRuntime {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
-        let status = self.status.get();
-        match status {
-            RuntimeStatus::Running | RuntimeStatus::Starting => return Ok(()),
-            RuntimeStatus::Stopped => self.status.store(RuntimeStatus::Starting),
-            RuntimeStatus::Stopping => bail!("Client is stopping"),
+        match self.status.get() {
+            RuntimeStatus::Running => return Ok(()),
+            RuntimeStatus::Stopped => self.status.store(RuntimeStatus::Running),
+            _ => unreachable!(),
         }
 
         let break_notify = Arc::new(Notify::new());
@@ -92,11 +87,9 @@ impl WsIoClientRuntime {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
-        let status = self.status.get();
-        match status {
+        match self.status.get() {
             RuntimeStatus::Stopped | RuntimeStatus::Stopping => return Ok(()),
             RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
-            RuntimeStatus::Starting => bail!("Client is starting"),
         }
 
         if let Some(break_run_connection_loop_notify) = self.break_run_connection_loop_notify.load_full() {
@@ -180,10 +173,8 @@ impl WsIoClientRuntime {
 
     pub(crate) async fn run_connection_loop(self: &Arc<Self>, break_notify: Arc<Notify>) {
         loop {
-            match self.status.get() {
-                RuntimeStatus::Running => {}
-                RuntimeStatus::Starting => self.status.store(RuntimeStatus::Running),
-                _ => break,
+            if !self.status.is(RuntimeStatus::Running) {
+                break;
             }
 
             let _ = self.run_connection().await;
