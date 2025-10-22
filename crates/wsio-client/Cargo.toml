@@ -19,6 +19,7 @@ repository.workspace = true
 [dependencies]
 anyhow = "1.0.100"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
+num_enum = "0.7.5"
 serde = "1.0.228"
 tokio = { version = "1.48.0", features = ["macros", "rt", "sync", "time"] }
 tokio-tungstenite = "0.28.0"

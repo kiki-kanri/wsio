@@ -8,13 +8,16 @@ use anyhow::{
     bail,
 };
 use http::HeaderMap;
+use num_enum::{
+    IntoPrimitive,
+    TryFromPrimitive,
+};
 use serde::Serialize;
 use tokio::{
     select,
     spawn,
     sync::{
         Mutex,
-        RwLock,
         mpsc::{
             Receiver,
             Sender,
@@ -34,14 +37,18 @@ mod extensions;
 use self::extensions::WsIoServerConnectionExtensions;
 use crate::{
     WsIoServer,
-    core::packet::{
-        WsIoPacket,
-        WsIoPacketType,
+    core::{
+        atomic::status::AtomicStatus,
+        packet::{
+            WsIoPacket,
+            WsIoPacketType,
+        },
     },
     namespace::WsIoServerNamespace,
 };
 
-#[derive(Debug)]
+#[repr(u8)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
 enum ConnectionStatus {
     Activating,
     Authenticating,
@@ -69,7 +76,7 @@ pub struct WsIoServerConnection {
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<OnCloseHandler>>,
     sid: String,
-    status: RwLock<ConnectionStatus>,
+    status: AtomicStatus<ConnectionStatus>,
 }
 
 impl WsIoServerConnection {
@@ -91,7 +98,7 @@ impl WsIoServerConnection {
                 namespace,
                 on_close_handler: Mutex::new(None),
                 sid,
-                status: RwLock::new(ConnectionStatus::Created),
+                status: AtomicStatus::new(ConnectionStatus::Created),
             }),
             message_rx,
         )
@@ -105,12 +112,12 @@ impl WsIoServerConnection {
     }
 
     async fn activate(self: &Arc<Self>) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::Authenticating | ConnectionStatus::Created => *status = ConnectionStatus::Activating,
-                _ => bail!("Cannot activate connection in invalid status: {:#?}", *status),
+        let status = self.status.get();
+        match status {
+            ConnectionStatus::Authenticating | ConnectionStatus::Created => {
+                self.status.try_transition(status, ConnectionStatus::Activating)?
             }
+            _ => bail!("Cannot activate connection in invalid status: {:#?}", status),
         }
 
         if let Some(middleware) = &self.namespace.config.middleware {
@@ -129,7 +136,9 @@ impl WsIoServerConnection {
         })
         .await?;
 
-        *self.status.write().await = ConnectionStatus::Ready;
+        self.status
+            .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
+
         if let Some(on_ready_handler) = &self.namespace.config.on_ready_handler {
             on_ready_handler(self.clone()).await?;
         }
@@ -138,12 +147,10 @@ impl WsIoServerConnection {
     }
 
     async fn handle_auth_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::AwaitingAuth => *status = ConnectionStatus::Authenticating,
-                _ => bail!("Received auth packet in invalid status: {:#?}", *status),
-            }
+        let status = self.status.get();
+        match status {
+            ConnectionStatus::AwaitingAuth => self.status.try_transition(status, ConnectionStatus::Authenticating)?,
+            _ => bail!("Received auth packet in invalid status: {:#?}", status),
         }
 
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
@@ -164,7 +171,7 @@ impl WsIoServerConnection {
 
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
-        *self.status.write().await = ConnectionStatus::Closing;
+        self.status.store(ConnectionStatus::Closing);
         self.abort_auth_timeout_task().await;
         self.namespace.remove_connection(&self.sid);
         self.cancel_token.cancel();
@@ -172,16 +179,13 @@ impl WsIoServerConnection {
             let _ = on_close_handler(self.clone()).await;
         }
 
-        *self.status.write().await = ConnectionStatus::Closed;
+        self.status.store(ConnectionStatus::Closed);
     }
 
     pub(crate) async fn close(&self) {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::Closed | ConnectionStatus::Closing => return,
-                _ => *status = ConnectionStatus::Closing,
-            }
+        match self.status.get() {
+            ConnectionStatus::Closed | ConnectionStatus::Closing => return,
+            _ => self.status.store(ConnectionStatus::Closing),
         }
 
         let _ = self.message_tx.send(Message::Close(None)).await;
@@ -204,11 +208,11 @@ impl WsIoServerConnection {
         };
 
         if require_auth {
-            *self.status.write().await = ConnectionStatus::AwaitingAuth;
+            self.status.store(ConnectionStatus::AwaitingAuth);
             let connection = self.clone();
             *self.auth_timeout_task.lock().await = Some(spawn(async move {
                 sleep(connection.namespace.config.auth_timeout).await;
-                if matches!(*connection.status.read().await, ConnectionStatus::AwaitingAuth) {
+                if matches!(connection.status.get(), ConnectionStatus::AwaitingAuth) {
                     connection.close().await;
                 }
             }));

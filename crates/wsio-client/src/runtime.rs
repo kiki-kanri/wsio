@@ -8,6 +8,10 @@ use futures_util::{
     SinkExt,
     StreamExt,
 };
+use num_enum::{
+    IntoPrimitive,
+    TryFromPrimitive,
+};
 use tokio::{
     select,
     spawn,
@@ -26,9 +30,14 @@ use tokio_tungstenite::{
 use crate::{
     config::WsIoClientConfig,
     connection::WsIoClientConnection,
-    core::packet::WsIoPacket,
+    core::{
+        atomic::status::AtomicStatus,
+        packet::WsIoPacket,
+    },
 };
 
+#[repr(u8)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
 enum WsIoClientRuntimeStatus {
     Running,
     Starting,
@@ -40,7 +49,8 @@ pub(crate) struct WsIoClientRuntime {
     pub(crate) config: WsIoClientConfig,
     connection: RwLock<Option<Arc<WsIoClientConnection>>>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
-    status: RwLock<WsIoClientRuntimeStatus>,
+    operate_lock: Mutex<()>,
+    status: AtomicStatus<WsIoClientRuntimeStatus>,
 }
 
 impl WsIoClientRuntime {
@@ -49,19 +59,21 @@ impl WsIoClientRuntime {
             config,
             connection: RwLock::new(None),
             connection_loop_task: Mutex::new(None),
-            status: RwLock::new(WsIoClientRuntimeStatus::Stopped),
+            operate_lock: Mutex::new(()),
+            status: AtomicStatus::new(WsIoClientRuntimeStatus::Stopped),
         })
     }
 
     // Protected methods
     pub(crate) async fn connect(self: &Arc<Self>) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                WsIoClientRuntimeStatus::Running | WsIoClientRuntimeStatus::Starting => return Ok(()),
-                WsIoClientRuntimeStatus::Stopped => *status = WsIoClientRuntimeStatus::Starting,
-                WsIoClientRuntimeStatus::Stopping => bail!("Client is stopping"),
-            }
+        // Lock to prevent concurrent operation
+        let _lock = self.operate_lock.lock().await;
+
+        let status = self.status.get();
+        match status {
+            WsIoClientRuntimeStatus::Running | WsIoClientRuntimeStatus::Starting => return Ok(()),
+            WsIoClientRuntimeStatus::Stopped => self.status.store(WsIoClientRuntimeStatus::Starting),
+            WsIoClientRuntimeStatus::Stopping => bail!("Client is stopping"),
         }
 
         let runtime = self.clone();
@@ -70,13 +82,14 @@ impl WsIoClientRuntime {
     }
 
     pub(crate) async fn disconnect(self: &Arc<Self>) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                WsIoClientRuntimeStatus::Stopped | WsIoClientRuntimeStatus::Stopping => return Ok(()),
-                WsIoClientRuntimeStatus::Running => *status = WsIoClientRuntimeStatus::Stopping,
-                WsIoClientRuntimeStatus::Starting => bail!("Client is starting"),
-            }
+        // Lock to prevent concurrent operation
+        let _lock = self.operate_lock.lock().await;
+
+        let status = self.status.get();
+        match status {
+            WsIoClientRuntimeStatus::Stopped | WsIoClientRuntimeStatus::Stopping => return Ok(()),
+            WsIoClientRuntimeStatus::Running => self.status.store(WsIoClientRuntimeStatus::Stopping),
+            WsIoClientRuntimeStatus::Starting => bail!("Client is starting"),
         }
 
         if let Some(connection) = &*self.connection.read().await {
@@ -87,7 +100,7 @@ impl WsIoClientRuntime {
             let _ = connection_loop_task.await;
         }
 
-        *self.status.write().await = WsIoClientRuntimeStatus::Stopped;
+        self.status.store(WsIoClientRuntimeStatus::Stopped);
         Ok(())
     }
 
@@ -156,17 +169,14 @@ impl WsIoClientRuntime {
 
     pub(crate) async fn run_connection_loop(self: &Arc<Self>) {
         loop {
-            {
-                let mut status = self.status.write().await;
-                match *status {
-                    WsIoClientRuntimeStatus::Running => {}
-                    WsIoClientRuntimeStatus::Starting => *status = WsIoClientRuntimeStatus::Running,
-                    _ => break,
-                }
+            match self.status.get() {
+                WsIoClientRuntimeStatus::Running => {}
+                WsIoClientRuntimeStatus::Starting => self.status.store(WsIoClientRuntimeStatus::Running),
+                _ => break,
             }
 
             let _ = self.run_connection().await;
-            if matches!(*self.status.read().await, WsIoClientRuntimeStatus::Running) {
+            if matches!(self.status.get(), WsIoClientRuntimeStatus::Running) {
                 sleep(self.config.reconnection_delay).await;
             } else {
                 break;

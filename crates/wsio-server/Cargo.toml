@@ -25,6 +25,7 @@ http = "1.3.1"
 http-body = "1.0.1"
 hyper = "1.7.0"
 hyper-util = { version = "0.1.17", features = ["tokio"] }
+num_enum = "0.7.5"
 serde = "1.0.228"
 tokio = { version = "1.48.0", features = ["macros", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["handshake"] }

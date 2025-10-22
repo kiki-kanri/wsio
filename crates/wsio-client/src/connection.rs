@@ -5,11 +5,14 @@ use anyhow::{
     anyhow,
     bail,
 };
+use num_enum::{
+    IntoPrimitive,
+    TryFromPrimitive,
+};
 use tokio::{
     spawn,
     sync::{
         Mutex,
-        RwLock,
         mpsc::{
             Receiver,
             Sender,
@@ -22,14 +25,18 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
-    core::packet::{
-        WsIoPacket,
-        WsIoPacketType,
+    core::{
+        atomic::status::AtomicStatus,
+        packet::{
+            WsIoPacket,
+            WsIoPacketType,
+        },
     },
     runtime::WsIoClientRuntime,
 };
 
-#[derive(Debug)]
+#[repr(u8)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
 enum ConnectionStatus {
     AwaitingInit,
     AwaitingReady,
@@ -46,7 +53,7 @@ pub struct WsIoClientConnection {
     message_tx: Sender<Message>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
-    status: RwLock<ConnectionStatus>,
+    status: AtomicStatus<ConnectionStatus>,
 }
 
 impl WsIoClientConnection {
@@ -59,7 +66,7 @@ impl WsIoClientConnection {
                 message_tx,
                 ready_timeout_task: Mutex::new(None),
                 runtime,
-                status: RwLock::new(ConnectionStatus::Created),
+                status: AtomicStatus::new(ConnectionStatus::Created),
             }),
             message_rx,
         )
@@ -72,12 +79,10 @@ impl WsIoClientConnection {
     }
 
     async fn handle_init_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::AwaitingInit => *status = ConnectionStatus::Initiating,
-                _ => bail!("Received init packet in invalid status: {:#?}", *status),
-            }
+        let status = self.status.get();
+        match status {
+            ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
+            _ => bail!("Received init packet in invalid status: {:#?}", status),
         }
 
         if let Some(init_timeout_task) = self.init_timeout_task.lock().await.take() {
@@ -85,11 +90,11 @@ impl WsIoClientConnection {
         }
 
         let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(bytes)?;
-        *self.status.write().await = ConnectionStatus::AwaitingReady;
+        self.status.store(ConnectionStatus::AwaitingReady);
         let connection = self.clone();
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.ready_timeout).await;
-            if matches!(*connection.status.read().await, ConnectionStatus::AwaitingReady) {
+            if matches!(connection.status.get(), ConnectionStatus::AwaitingReady) {
                 connection.close().await;
             }
         }));
@@ -111,19 +116,17 @@ impl WsIoClientConnection {
     }
 
     async fn handle_ready_packet(self: &Arc<Self>) -> Result<()> {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::AwaitingReady => *status = ConnectionStatus::Readying,
-                _ => bail!("Received ready packet in invalid status: {:#?}", *status),
-            }
+        let status = self.status.get();
+        match status {
+            ConnectionStatus::AwaitingReady => self.status.try_transition(status, ConnectionStatus::Readying)?,
+            _ => bail!("Received ready packet in invalid status: {:#?}", status),
         }
 
         if let Some(ready_timeout_task) = self.ready_timeout_task.lock().await.take() {
             ready_timeout_task.abort();
         }
 
-        *self.status.write().await = ConnectionStatus::Ready;
+        self.status.store(ConnectionStatus::Ready);
         if let Some(on_connection_ready_handler) = &self.runtime.config.on_connection_ready_handler {
             on_connection_ready_handler(self.clone()).await?;
         }
@@ -140,7 +143,7 @@ impl WsIoClientConnection {
 
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
-        *self.status.write().await = ConnectionStatus::Closing;
+        self.status.store(ConnectionStatus::Closing);
         if let Some(init_timeout_task) = self.init_timeout_task.lock().await.take() {
             init_timeout_task.abort();
         }
@@ -153,16 +156,13 @@ impl WsIoClientConnection {
             let _ = on_connection_close_handler(self.clone()).await;
         }
 
-        *self.status.write().await = ConnectionStatus::Closed;
+        self.status.store(ConnectionStatus::Closed);
     }
 
     pub(crate) async fn close(&self) {
-        {
-            let mut status = self.status.write().await;
-            match *status {
-                ConnectionStatus::Closed | ConnectionStatus::Closing => return,
-                _ => *status = ConnectionStatus::Closing,
-            }
+        match self.status.get() {
+            ConnectionStatus::Closed | ConnectionStatus::Closing => return,
+            _ => self.status.store(ConnectionStatus::Closing),
         }
 
         let _ = self.message_tx.send(Message::Close(None)).await;
@@ -185,11 +185,11 @@ impl WsIoClientConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) {
-        *self.status.write().await = ConnectionStatus::AwaitingInit;
+        self.status.store(ConnectionStatus::AwaitingInit);
         let connection = self.clone();
         *self.init_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.init_timeout).await;
-            if matches!(*connection.status.read().await, ConnectionStatus::AwaitingInit) {
+            if matches!(connection.status.get(), ConnectionStatus::AwaitingInit) {
                 connection.close().await;
             }
         }));

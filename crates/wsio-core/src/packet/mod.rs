@@ -10,8 +10,8 @@ use serde_with::skip_serializing_none;
 
 pub mod codecs;
 
-#[derive(Clone, Debug, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
+#[derive(Clone, Debug, Deserialize_repr, Serialize_repr)]
 pub enum WsIoPacketType {
     Auth = 0,
     Disconnect = 1,
