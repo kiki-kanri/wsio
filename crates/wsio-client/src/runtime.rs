@@ -154,7 +154,7 @@ impl WsIoClientRuntime {
                 }
 
                 if is_close {
-                    let _ = ws_stream_writer.flush().await;
+                    let _ = ws_stream_writer.close().await;
                     break;
                 }
             }
