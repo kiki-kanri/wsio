@@ -61,8 +61,11 @@ pub struct WsIoClientConnection {
 
 impl WsIoClientConnection {
     pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
-        // TODO: use config set buf size
-        let (message_tx, message_rx) = channel(512);
+        let channel_capacity = (runtime.config.websocket_config.max_write_buffer_size
+            / runtime.config.websocket_config.write_buffer_size)
+            .clamp(64, 4096);
+
+        let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
                 cancel_token: CancellationToken::new(),

@@ -85,8 +85,11 @@ impl WsIoServerConnection {
         namespace: Arc<WsIoServerNamespace>,
         sid: String,
     ) -> (Arc<Self>, Receiver<Message>) {
-        // TODO: use config set buf size
-        let (message_tx, message_rx) = channel(512);
+        let channel_capacity = (namespace.config.websocket_config.max_write_buffer_size
+            / namespace.config.websocket_config.write_buffer_size)
+            .clamp(64, 4096);
+
+        let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
