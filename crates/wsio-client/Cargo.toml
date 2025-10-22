@@ -18,6 +18,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0.100"
+arc-swap = "1.7.1"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 num_enum = "0.7.5"
 serde = "1.0.228"

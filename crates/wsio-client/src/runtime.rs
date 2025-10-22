@@ -4,6 +4,7 @@ use anyhow::{
     Result,
     bail,
 };
+use arc_swap::ArcSwapOption;
 use futures_util::{
     SinkExt,
     StreamExt,
@@ -15,10 +16,7 @@ use num_enum::{
 use tokio::{
     select,
     spawn,
-    sync::{
-        Mutex,
-        RwLock,
-    },
+    sync::Mutex,
     task::JoinHandle,
     time::sleep,
 };
@@ -47,7 +45,7 @@ enum WsIoClientRuntimeStatus {
 
 pub(crate) struct WsIoClientRuntime {
     pub(crate) config: WsIoClientConfig,
-    connection: RwLock<Option<Arc<WsIoClientConnection>>>,
+    connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
     operate_lock: Mutex<()>,
     status: AtomicStatus<WsIoClientRuntimeStatus>,
@@ -57,7 +55,7 @@ impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
         Arc::new(Self {
             config,
-            connection: RwLock::new(None),
+            connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(WsIoClientRuntimeStatus::Stopped),
@@ -92,7 +90,7 @@ impl WsIoClientRuntime {
             WsIoClientRuntimeStatus::Starting => bail!("Client is starting"),
         }
 
-        if let Some(connection) = &*self.connection.read().await {
+        if let Some(connection) = self.connection.load_full() {
             connection.close().await;
         }
 
@@ -156,13 +154,13 @@ impl WsIoClientRuntime {
             }
         });
 
-        *self.connection.write().await = Some(connection.clone());
+        self.connection.store(Some(connection.clone()));
         select! {
             _ = read_ws_stream_task => {},
             _ = write_ws_stream_task => {},
         }
 
-        *self.connection.write().await = None;
+        self.connection.store(None);
         connection.cleanup().await;
         Ok(())
     }
