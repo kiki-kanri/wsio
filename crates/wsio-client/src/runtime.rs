@@ -189,8 +189,8 @@ impl WsIoClientRuntime {
             let _ = self.run_connection().await;
             if matches!(self.status.get(), WsIoClientRuntimeStatus::Running) {
                 select! {
-                    _ = sleep(self.config.reconnection_delay) => {},
                     _ = break_notify.notified() => {},
+                    _ = sleep(self.config.reconnection_delay) => {},
                 }
             } else {
                 break;
