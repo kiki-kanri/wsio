@@ -20,7 +20,7 @@ type AuthHandler = Box<
         + 'static,
 >;
 
-type OnlyConnectionParamHandler = Box<
+type OnlyConnectionParamHandler = Arc<
     dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
         + Sync

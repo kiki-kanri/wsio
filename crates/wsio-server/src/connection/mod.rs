@@ -85,8 +85,11 @@ impl WsIoServerConnection {
         namespace: Arc<WsIoServerNamespace>,
         sid: String,
     ) -> (Arc<Self>, Receiver<Message>) {
-        // TODO: use config set buf size
-        let (message_tx, message_rx) = channel(512);
+        let channel_capacity = (namespace.config.websocket_config.max_write_buffer_size
+            / namespace.config.websocket_config.write_buffer_size)
+            .clamp(64, 4096);
+
+        let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
@@ -139,8 +142,9 @@ impl WsIoServerConnection {
         self.status
             .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
 
-        if let Some(on_ready_handler) = &self.namespace.config.on_ready_handler {
-            on_ready_handler(self.clone()).await?;
+        if let Some(on_ready_handler) = self.namespace.config.on_ready_handler.clone() {
+            let connection = self.clone();
+            self.spawn_task(async move { on_ready_handler(connection).await });
         }
 
         Ok(())
@@ -290,7 +294,7 @@ impl WsIoServerConnection {
 
     #[inline]
     pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
-        let cancel_token = self.cancel_token().clone();
+        let cancel_token = self.cancel_token.clone();
         spawn(async move {
             select! {
                 _ = cancel_token.cancelled() => {},
