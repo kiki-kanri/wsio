@@ -3,14 +3,16 @@ name = "client"
 
 edition.workspace = true
 
+# Dependencies
 [dependencies]
-anyhow = "1.0.100"
-axum = "0.8.6"
-kikiutils = { version = "0.5.6", features = ["signal", "task"] }
-tikv-jemallocator = { version = "0.6.1", features = ["background_threads_runtime_support", "background_threads"] }
-tokio = { version = "1.48.0", features = ["rt-multi-thread"] }
-wsio-client = { path = "../../crates/wsio-client", features = ["full"] }
+anyhow.workspace = true
+axum.workspace = true
+kikiutils.workspace = true
+tikv-jemallocator.workspace = true
+tokio.workspace = true
+wsio-client.workspace = true
 
+# Binaries
 [[bin]]
 name = "client"
 path = "client.rs"
