@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.2.2](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.2.1...wsio-client-v0.2.2) - 2025-10-22 05:54
+
+### 🏀 Examples
+
+- move files to `examples` workspace ([667bfe5](https://github.com/ws-io/ws.io-rs/commit/667bfe5))
+- add disconnect example ([dacb448](https://github.com/ws-io/ws.io-rs/commit/dacb448))
+- add `connection_stress` client example ([61719a0](https://github.com/ws-io/ws.io-rs/commit/61719a0))
+- rename files ([cf536ad](https://github.com/ws-io/ws.io-rs/commit/cf536ad))
+
+### 🏡 Chore
+
+- *(client)* format `Cargo.toml` ([03bd228](https://github.com/ws-io/ws.io-rs/commit/03bd228))
+- disable or replace certain dependency features to reduce overall dependencies ([1d88ae3](https://github.com/ws-io/ws.io-rs/commit/1d88ae3))
+
+### 💅 Refactors
+
+- *(client)* change `WsIoClientRuntime.connection` to `ArcSwapOption<WsIoClientConnection>` ([e1576a2](https://github.com/ws-io/ws.io-rs/commit/e1576a2))
+- change all `status` fields to use `AtomicU8` and add operation lock for major actions like connect/disconnect ([5321b97](https://github.com/ws-io/ws.io-rs/commit/5321b97))
+- change return type of some `struct::new` functions to `Arc<Self>` ([a7ce497](https://github.com/ws-io/ws.io-rs/commit/a7ce497))
+- rename `xxxConnectionStatus` to `ConnectionStatus` ([3863d68](https://github.com/ws-io/ws.io-rs/commit/3863d68))
+- update some format usage ([efdba68](https://github.com/ws-io/ws.io-rs/commit/efdba68))
+- simplify status checking and transitions within `connection.close` ([d5c478e](https://github.com/ws-io/ws.io-rs/commit/d5c478e))
+- replace `match` statements for extracting and converting `Option` values with chained `map` and `transpose` calls ([cf7f9b3](https://github.com/ws-io/ws.io-rs/commit/cf7f9b3))
+
+### 🚀 Enhancements
+
+- *(client)* add clone derive to `WsIoClient` ([53c3476](https://github.com/ws-io/ws.io-rs/commit/53c3476))
+- allow configuration of WebSocket settings such as `max_frame_size` ([0b2b491](https://github.com/ws-io/ws.io-rs/commit/0b2b491))
+- *(client)* handle disconnect packet ([4da8353](https://github.com/ws-io/ws.io-rs/commit/4da8353))
+
+### 🩹 Fixes
+
+- *(client)* ensure `disconnect` immediately breaks `run_connection_loop` even if it's sleeping ([0f4a780](https://github.com/ws-io/ws.io-rs/commit/0f4a780))
+- *(client)* normalize multiple consecutive slashes in URL namespace to a single slash ([0322671](https://github.com/ws-io/ws.io-rs/commit/0322671))
+- *(client)* resolve issue where leading `/` in connection URL path caused connection failure ([fa5ca8c](https://github.com/ws-io/ws.io-rs/commit/fa5ca8c))
+
 ## [0.2.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.2.0...wsio-client-v0.2.1) - 2025-10-20 17:48
 
 ### 🏀 Examples
