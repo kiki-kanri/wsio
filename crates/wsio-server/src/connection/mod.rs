@@ -48,7 +48,7 @@ use crate::{
 };
 
 #[repr(u8)]
-#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum ConnectionStatus {
     Activating,
     Authenticating,
@@ -248,6 +248,11 @@ impl WsIoServerConnection {
     }
 
     pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
+        let status = self.status.get();
+        if status != ConnectionStatus::Ready {
+            bail!("Cannot emit event in invalid status: {:#?}", status);
+        }
+
         self.send_packet(&WsIoPacket {
             data: data
                 .map(|data| self.namespace.config.packet_codec.encode_data(data))
