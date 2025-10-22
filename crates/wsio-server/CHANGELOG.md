@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.3.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.3.0...wsio-server-v0.3.1) - 2025-10-22 05:54
+
+### 🏀 Examples
+
+- move files to `examples` workspace ([667bfe5](https://github.com/ws-io/ws.io-rs/commit/667bfe5))
+- add disconnect example ([dacb448](https://github.com/ws-io/ws.io-rs/commit/dacb448))
+- rename files ([cf536ad](https://github.com/ws-io/ws.io-rs/commit/cf536ad))
+
+### 🏡 Chore
+
+- disable or replace certain dependency features to reduce overall dependencies ([1d88ae3](https://github.com/ws-io/ws.io-rs/commit/1d88ae3))
+
+### 💅 Refactors
+
+- change all `status` fields to use `AtomicU8` and add operation lock for major actions like connect/disconnect ([5321b97](https://github.com/ws-io/ws.io-rs/commit/5321b97))
+- *(server)* tidy up code ([2b7e382](https://github.com/ws-io/ws.io-rs/commit/2b7e382))
+- *(server)* move `WsIoServerRuntime.handle_on_upgrade_request` into `WsIoServerNamespace` ([a7d1157](https://github.com/ws-io/ws.io-rs/commit/a7d1157))
+- change return type of some `struct::new` functions to `Arc<Self>` ([a7ce497](https://github.com/ws-io/ws.io-rs/commit/a7ce497))
+- *(server)* move spawn of request upgrade task in `dispatch_request` to runtime and register task in map for better management ([63bdb1a](https://github.com/ws-io/ws.io-rs/commit/63bdb1a))
+- rename `xxxConnectionStatus` to `ConnectionStatus` ([3863d68](https://github.com/ws-io/ws.io-rs/commit/3863d68))
+- update some format usage ([efdba68](https://github.com/ws-io/ws.io-rs/commit/efdba68))
+- simplify status checking and transitions within `connection.close` ([d5c478e](https://github.com/ws-io/ws.io-rs/commit/d5c478e))
+- replace `match` statements for extracting and converting `Option` values with chained `map` and `transpose` calls ([cf7f9b3](https://github.com/ws-io/ws.io-rs/commit/cf7f9b3))
+
+### 🚀 Enhancements
+
+- *(server)* add `WsIoServerConnectionExtensions` ([3dca472](https://github.com/ws-io/ws.io-rs/commit/3dca472))
+- allow configuration of WebSocket settings such as `max_frame_size` ([0b2b491](https://github.com/ws-io/ws.io-rs/commit/0b2b491))
+- *(server)* add `WsIoServerConnection.emit` method ([f6ff682](https://github.com/ws-io/ws.io-rs/commit/f6ff682))
+- *(server)* add `WsIoServerConnection.spawn_task` method ([8a25fcf](https://github.com/ws-io/ws.io-rs/commit/8a25fcf))
+
 ## [0.3.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.2.1...wsio-server-v0.3.0) - 2025-10-20 17:48
 
 ### 🏀 Examples

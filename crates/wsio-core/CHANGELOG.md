@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.0...wsio-core-v0.3.1) - 2025-10-22 05:54
+
+### 🎨 Styles
+
+- *(core)* format code ([af9329d](https://github.com/ws-io/ws.io-rs/commit/af9329d))
+
+### 💅 Refactors
+
+- change all `status` fields to use `AtomicU8` and add operation lock for major actions like connect/disconnect ([5321b97](https://github.com/ws-io/ws.io-rs/commit/5321b97))
+
 ## [0.3.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.2.0...wsio-core-v0.3.0) - 2025-10-20 17:48
 
 ### 💅 Refactors
