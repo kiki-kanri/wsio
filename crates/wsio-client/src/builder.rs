@@ -53,12 +53,14 @@ impl WsIoClientBuilder {
         Ok(Self {
             config: WsIoClientConfig {
                 auth_handler: None,
+                auth_handler_timeout: Duration::from_secs(3),
                 connect_url: url,
-                init_timeout: Duration::from_secs(3),
+                init_packet_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
+                on_connection_close_handler_timeout: Duration::from_secs(2),
                 on_connection_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
-                ready_timeout: Duration::from_secs(3),
+                ready_packet_timeout: Duration::from_secs(3),
                 reconnection_delay: Duration::from_secs(1),
                 websocket_config: WebSocketConfig::default()
                     .max_frame_size(Some(8 * 1024 * 1024))
@@ -91,12 +93,17 @@ impl WsIoClientBuilder {
         self
     }
 
+    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_handler_timeout = duration;
+        self
+    }
+
     pub fn build(self) -> WsIoClient {
         WsIoClient(WsIoClientRuntime::new(self.config))
     }
 
-    pub fn init_timeout(mut self, duration: Duration) -> Self {
-        self.config.init_timeout = duration;
+    pub fn init_packet_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_packet_timeout = duration;
         self
     }
 
@@ -106,6 +113,11 @@ impl WsIoClientBuilder {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.config.on_connection_close_handler = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self
+    }
+
+    pub fn on_connection_close_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_connection_close_handler_timeout = duration;
         self
     }
 
@@ -123,8 +135,8 @@ impl WsIoClientBuilder {
         self
     }
 
-    pub fn ready_timeout(mut self, duration: Duration) -> Self {
-        self.config.ready_timeout = duration;
+    pub fn ready_packet_timeout(mut self, duration: Duration) -> Self {
+        self.config.ready_packet_timeout = duration;
         self
     }
 

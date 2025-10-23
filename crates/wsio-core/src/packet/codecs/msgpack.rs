@@ -40,7 +40,6 @@ impl WsIoPacketMsgPackCodec {
         Ok(from_slice(bytes)?)
     }
 
-    // TODO: &WsIoPacket
     #[inline]
     pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
         let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);

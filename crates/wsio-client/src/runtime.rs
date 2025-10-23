@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{
-    Result,
-    bail,
-};
+use anyhow::Result;
 use arc_swap::ArcSwapOption;
 use futures_util::{
     SinkExt,
@@ -39,9 +36,8 @@ use crate::{
 
 #[repr(u8)]
 #[derive(Debug, IntoPrimitive, TryFromPrimitive)]
-enum WsIoClientRuntimeStatus {
+enum RuntimeStatus {
     Running,
-    Starting,
     Stopped,
     Stopping,
 }
@@ -52,7 +48,7 @@ pub(crate) struct WsIoClientRuntime {
     connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
     operate_lock: Mutex<()>,
-    status: AtomicStatus<WsIoClientRuntimeStatus>,
+    status: AtomicStatus<RuntimeStatus>,
 }
 
 impl WsIoClientRuntime {
@@ -63,7 +59,7 @@ impl WsIoClientRuntime {
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             operate_lock: Mutex::new(()),
-            status: AtomicStatus::new(WsIoClientRuntimeStatus::Stopped),
+            status: AtomicStatus::new(RuntimeStatus::Stopped),
         })
     }
 
@@ -72,11 +68,10 @@ impl WsIoClientRuntime {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
-        let status = self.status.get();
-        match status {
-            WsIoClientRuntimeStatus::Running | WsIoClientRuntimeStatus::Starting => return Ok(()),
-            WsIoClientRuntimeStatus::Stopped => self.status.store(WsIoClientRuntimeStatus::Starting),
-            WsIoClientRuntimeStatus::Stopping => bail!("Client is stopping"),
+        match self.status.get() {
+            RuntimeStatus::Running => return Ok(()),
+            RuntimeStatus::Stopped => self.status.store(RuntimeStatus::Running),
+            _ => unreachable!(),
         }
 
         let break_notify = Arc::new(Notify::new());
@@ -92,11 +87,9 @@ impl WsIoClientRuntime {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
-        let status = self.status.get();
-        match status {
-            WsIoClientRuntimeStatus::Stopped | WsIoClientRuntimeStatus::Stopping => return Ok(()),
-            WsIoClientRuntimeStatus::Running => self.status.store(WsIoClientRuntimeStatus::Stopping),
-            WsIoClientRuntimeStatus::Starting => bail!("Client is starting"),
+        match self.status.get() {
+            RuntimeStatus::Stopped | RuntimeStatus::Stopping => return Ok(()),
+            RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
         }
 
         if let Some(break_run_connection_loop_notify) = self.break_run_connection_loop_notify.load_full() {
@@ -104,14 +97,14 @@ impl WsIoClientRuntime {
         }
 
         if let Some(connection) = self.connection.load_full() {
-            connection.close().await;
+            connection.close();
         }
 
         if let Some(connection_loop_task) = self.connection_loop_task.lock().await.take() {
             let _ = connection_loop_task.await;
         }
 
-        self.status.store(WsIoClientRuntimeStatus::Stopped);
+        self.status.store(RuntimeStatus::Stopped);
         Ok(())
     }
 
@@ -137,7 +130,8 @@ impl WsIoClientRuntime {
 
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
         let connection_clone = connection.clone();
-        let read_ws_stream_task = spawn(async move {
+        let mut read_ws_stream_task = spawn(async move {
+            // TODO: FIFO message
             while let Some(message) = ws_stream_reader.next().await {
                 if match message {
                     Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
@@ -153,7 +147,7 @@ impl WsIoClientRuntime {
             }
         });
 
-        let write_ws_stream_task = spawn(async move {
+        let mut write_ws_stream_task = spawn(async move {
             while let Some(message) = message_rx.recv().await {
                 let is_close = matches!(message, Message::Close(_));
                 if ws_stream_writer.send(message).await.is_err() {
@@ -161,7 +155,7 @@ impl WsIoClientRuntime {
                 }
 
                 if is_close {
-                    let _ = ws_stream_writer.flush().await;
+                    let _ = ws_stream_writer.close().await;
                     break;
                 }
             }
@@ -169,8 +163,12 @@ impl WsIoClientRuntime {
 
         self.connection.store(Some(connection.clone()));
         select! {
-            _ = read_ws_stream_task => {},
-            _ = write_ws_stream_task => {},
+            _ = &mut read_ws_stream_task => {
+                write_ws_stream_task.abort();
+            },
+            _ = &mut write_ws_stream_task => {
+                read_ws_stream_task.abort();
+            },
         }
 
         self.connection.store(None);
@@ -180,16 +178,16 @@ impl WsIoClientRuntime {
 
     pub(crate) async fn run_connection_loop(self: &Arc<Self>, break_notify: Arc<Notify>) {
         loop {
-            match self.status.get() {
-                WsIoClientRuntimeStatus::Running => {}
-                WsIoClientRuntimeStatus::Starting => self.status.store(WsIoClientRuntimeStatus::Running),
-                _ => break,
+            if !self.status.is(RuntimeStatus::Running) {
+                break;
             }
 
             let _ = self.run_connection().await;
-            if matches!(self.status.get(), WsIoClientRuntimeStatus::Running) {
+            if self.status.is(RuntimeStatus::Running) {
                 select! {
-                    _ = break_notify.notified() => {},
+                    _ = break_notify.notified() => {
+                        break;
+                    },
                     _ = sleep(self.config.reconnection_delay) => {},
                 }
             } else {

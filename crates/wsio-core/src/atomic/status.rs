@@ -32,6 +32,11 @@ impl<T: Into<u8> + TryFrom<u8>> AtomicStatus<T> {
     }
 
     #[inline]
+    pub fn is(&self, status: T) -> bool {
+        self.inner.load(Ordering::SeqCst) == status.into()
+    }
+
+    #[inline]
     pub fn store(&self, status: T) {
         self.inner.store(status.into(), Ordering::SeqCst);
     }

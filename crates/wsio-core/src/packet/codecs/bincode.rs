@@ -49,7 +49,6 @@ impl WsIoPacketBincodeCodec {
         EMPTY_DATA_ENCODED.as_ref()
     }
 
-    // TODO: &WsIoPacket
     #[inline]
     pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
         let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);

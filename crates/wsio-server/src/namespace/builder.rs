@@ -27,9 +27,13 @@ impl WsIoServerNamespaceBuilder {
         Self {
             config: WsIoServerNamespaceConfig {
                 auth_handler: None,
-                auth_timeout: runtime.config.auth_timeout,
+                auth_handler_timeout: runtime.config.auth_handler_timeout,
+                auth_packet_timeout: runtime.config.auth_packet_timeout,
                 middleware: None,
+                middleware_execution_timeout: runtime.config.middleware_execution_timeout,
                 on_connect_handler: None,
+                on_close_handler_timeout: runtime.config.on_close_handler_timeout,
+                on_connect_handler_timeout: runtime.config.on_connect_handler_timeout,
                 on_ready_handler: None,
                 packet_codec: runtime.config.packet_codec,
                 path: path.into(),
@@ -40,8 +44,23 @@ impl WsIoServerNamespaceBuilder {
     }
 
     // Public methods
-    pub fn auth_timeout(mut self, duration: Duration) -> Self {
-        self.config.auth_timeout = duration;
+    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_handler_timeout = duration;
+        self
+    }
+
+    pub fn auth_packet_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_packet_timeout = duration;
+        self
+    }
+
+    pub fn middleware_execution_timeout(mut self, duration: Duration) -> Self {
+        self.config.middleware_execution_timeout = duration;
+        self
+    }
+
+    pub fn on_close_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_close_handler_timeout = duration;
         self
     }
 
@@ -51,6 +70,11 @@ impl WsIoServerNamespaceBuilder {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.config.on_connect_handler = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self
+    }
+
+    pub fn on_connect_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_connect_handler_timeout = duration;
         self
     }
 

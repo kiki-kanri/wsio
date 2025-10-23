@@ -17,7 +17,11 @@ impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
         Self {
             config: WsIoServerConfig {
-                auth_timeout: Duration::from_secs(3),
+                auth_handler_timeout: Duration::from_secs(3),
+                auth_packet_timeout: Duration::from_secs(5),
+                middleware_execution_timeout: Duration::from_secs(3),
+                on_close_handler_timeout: Duration::from_secs(2),
+                on_connect_handler_timeout: Duration::from_secs(2),
                 packet_codec: WsIoPacketCodec::SerdeJson,
                 request_path: "/ws.io".into(),
                 websocket_config: WebSocketConfig::default()
@@ -31,8 +35,33 @@ impl WsIoServerBuilder {
     }
 
     // Public methods
+    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_handler_timeout = duration;
+        self
+    }
+
+    pub fn auth_packet_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_packet_timeout = duration;
+        self
+    }
+
     pub fn build(self) -> WsIoServer {
         WsIoServer(WsIoServerRuntime::new(self.config))
+    }
+
+    pub fn middleware_execution_timeout(mut self, duration: Duration) -> Self {
+        self.config.middleware_execution_timeout = duration;
+        self
+    }
+
+    pub fn on_close_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_close_handler_timeout = duration;
+        self
+    }
+
+    pub fn on_connect_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_connect_handler_timeout = duration;
+        self
     }
 
     pub fn packet_codec(mut self, packet_codec: WsIoPacketCodec) -> Self {
