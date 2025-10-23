@@ -104,14 +104,14 @@ impl WsIoClientConnection {
         // Decode init packet to determine if authentication is required
         let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(bytes)?;
 
-        // Transition connection state to AwaitingReady
+        // Transition state to AwaitingReady
         self.status
             .try_transition(ConnectionStatus::Initiating, ConnectionStatus::AwaitingReady)?;
 
         // Spawn ready-timeout watchdog to close connection if Ready is not received in time
         let connection = self.clone();
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
-            sleep(connection.runtime.config.ready_timeout).await;
+            sleep(connection.runtime.config.ready_packet_timeout).await;
             if connection.status.is(ConnectionStatus::AwaitingReady) {
                 connection.close().await;
             }
@@ -154,9 +154,8 @@ impl WsIoClientConnection {
 
         // Invoke on_connection_ready handler if configured
         if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
-            let connection = self.clone();
-
             // Run handler asynchronously in a detached task
+            let connection = self.clone();
             self.spawn_task(async move { on_connection_ready_handler(connection).await });
         }
 
@@ -227,7 +226,7 @@ impl WsIoClientConnection {
         self.status.store(ConnectionStatus::AwaitingInit);
         let connection = self.clone();
         *self.init_timeout_task.lock().await = Some(spawn(async move {
-            sleep(connection.runtime.config.init_timeout).await;
+            sleep(connection.runtime.config.init_packet_timeout).await;
             if connection.status.is(ConnectionStatus::AwaitingInit) {
                 connection.close().await;
             }
