@@ -6,7 +6,13 @@ use http::{
     Request,
     Response,
     StatusCode,
-    header,
+    header::{
+        CONNECTION,
+        SEC_WEBSOCKET_ACCEPT,
+        SEC_WEBSOCKET_KEY,
+        SEC_WEBSOCKET_VERSION,
+        UPGRADE,
+    },
 };
 use hyper::upgrade::OnUpgrade;
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
@@ -15,10 +21,11 @@ use url::form_urlencoded;
 use crate::runtime::WsIoServerRuntime;
 
 #[inline]
-fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &str) -> bool {
-    get_header_value(request, name)
-        .map(|v| v.eq_ignore_ascii_case(expected_value))
-        .unwrap_or(false)
+fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &[u8]) -> bool {
+    match request.headers().get(name) {
+        Some(value) => value.as_bytes().eq_ignore_ascii_case(expected_value),
+        None => false,
+    }
 }
 
 pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
@@ -30,23 +37,16 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         return respond(StatusCode::METHOD_NOT_ALLOWED);
     }
 
-    // Check upgrade header
-    if !check_header_value(&request, header::UPGRADE, "websocket") {
-        return respond(StatusCode::BAD_REQUEST);
-    }
-
-    // Check connection header
-    if !check_header_value(&request, header::CONNECTION, "upgrade") {
-        return respond(StatusCode::BAD_REQUEST);
-    }
-
-    // Check websocket version header
-    if !check_header_value(&request, header::SEC_WEBSOCKET_VERSION, "13") {
+    // Check required headers
+    if !check_header_value(&request, UPGRADE, b"websocket")
+        || !check_header_value(&request, CONNECTION, b"upgrade")
+        || !check_header_value(&request, SEC_WEBSOCKET_VERSION, b"13")
+    {
         return respond(StatusCode::BAD_REQUEST);
     }
 
     // Get websocket sec key
-    let Some(ws_sec_key) = get_header_value(&request, header::SEC_WEBSOCKET_KEY) else {
+    let Some(ws_sec_key) = request.headers().get(SEC_WEBSOCKET_KEY).and_then(|v| v.to_str().ok()) else {
         return respond(StatusCode::BAD_REQUEST);
     };
 
@@ -74,18 +74,14 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     };
 
     namespace.handle_on_upgrade_request(request.headers().clone(), on_upgrade);
+
     Ok(Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)
-        .header(header::CONNECTION, "Upgrade")
-        .header(header::SEC_WEBSOCKET_ACCEPT, ws_accept_key)
-        .header(header::UPGRADE, "websocket")
+        .header(CONNECTION, "Upgrade")
+        .header(SEC_WEBSOCKET_ACCEPT, ws_accept_key)
+        .header(UPGRADE, "websocket")
         .body(ResBody::default())
         .unwrap())
-}
-
-#[inline]
-fn get_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName) -> Option<&str> {
-    request.headers().get(name).and_then(|v| v.to_str().ok())
 }
 
 #[inline]
