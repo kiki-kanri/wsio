@@ -36,6 +36,7 @@ use crate::{
             WsIoPacket,
             WsIoPacketType,
         },
+        utils::task::abort_locked_task,
     },
     runtime::WsIoClientRuntime,
 };
@@ -83,18 +84,6 @@ impl WsIoClientConnection {
     }
 
     // Private methods
-    async fn abort_init_timeout_task(&self) {
-        if let Some(init_timeout_task) = self.init_timeout_task.lock().await.take() {
-            init_timeout_task.abort();
-        }
-    }
-
-    async fn abort_ready_timeout_task(&self) {
-        if let Some(ready_timeout_task) = self.ready_timeout_task.lock().await.take() {
-            ready_timeout_task.abort();
-        }
-    }
-
     async fn handle_disconnect_packet(&self) -> Result<()> {
         let runtime = self.runtime.clone();
         spawn(async move { runtime.disconnect().await });
@@ -110,7 +99,7 @@ impl WsIoClientConnection {
         }
 
         // Abort init-timeout task if still active
-        self.abort_init_timeout_task().await;
+        abort_locked_task(&self.init_timeout_task).await;
 
         // Decode init packet to determine if authentication is required
         let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(bytes)?;
@@ -161,7 +150,7 @@ impl WsIoClientConnection {
         }
 
         // Abort ready-timeout task if still active
-        self.abort_ready_timeout_task().await;
+        abort_locked_task(&self.ready_timeout_task).await;
 
         // Invoke on_connection_ready handler if configured
         if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
@@ -186,11 +175,9 @@ impl WsIoClientConnection {
         // Set connection state to Closing
         self.status.store(ConnectionStatus::Closing);
 
-        // Abort init-timeout task if still active
-        self.abort_init_timeout_task().await;
-
-        // Abort ready-timeout task if still active
-        self.abort_ready_timeout_task().await;
+        // Abort timeout tasks if still active
+        abort_locked_task(&self.init_timeout_task).await;
+        abort_locked_task(&self.ready_timeout_task).await;
 
         // Cancel all ongoing operations via cancel token
         self.cancel_token.cancel();
