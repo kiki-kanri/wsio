@@ -158,6 +158,7 @@ impl WsIoServerConnection {
         }
 
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
+            // TODO: exec handler timeout?
             (auth_handler)(self.clone(), packet_data).await?;
             self.abort_auth_timeout_task().await;
             self.activate().await

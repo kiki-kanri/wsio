@@ -109,6 +109,7 @@ impl WsIoClientConnection {
 
         if requires_auth {
             if let Some(auth_handler) = &self.runtime.config.auth_handler {
+                // TODO: exec handler timeout?
                 self.send_packet(&WsIoPacket {
                     data: auth_handler(self.clone()).await?,
                     key: None,

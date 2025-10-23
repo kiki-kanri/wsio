@@ -131,6 +131,7 @@ impl WsIoClientRuntime {
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
         let connection_clone = connection.clone();
         let read_ws_stream_task = spawn(async move {
+            // TODO: FIFO message
             while let Some(message) = ws_stream_reader.next().await {
                 if match message {
                     Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
@@ -162,6 +163,7 @@ impl WsIoClientRuntime {
 
         self.connection.store(Some(connection.clone()));
         select! {
+            // TODO: timeout wait read task
             _ = read_ws_stream_task => {},
             _ = write_ws_stream_task => {},
         }
