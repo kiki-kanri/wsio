@@ -183,7 +183,7 @@ impl WsIoClientRuntime {
             }
 
             let _ = self.run_connection().await;
-            if matches!(self.status.get(), RuntimeStatus::Running) {
+            if self.status.is(RuntimeStatus::Running) {
                 select! {
                     _ = break_notify.notified() => {
                         break;
