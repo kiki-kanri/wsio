@@ -34,7 +34,6 @@ pub(crate) struct WsIoServerConfig {
     /// Can be overridden by namespace-level configuration.
     pub(crate) packet_codec: WsIoPacketCodec,
 
-    ///
     pub(crate) request_path: String,
 
     /// Can be overridden by namespace-level configuration.
