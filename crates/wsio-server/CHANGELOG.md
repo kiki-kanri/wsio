@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.3.1...wsio-server-v0.4.0) - 2025-10-23 07:04
+
+### 🏡 Chore
+
+- [**breaking**] adjust default timeout durations ([4e882f7](https://github.com/ws-io/ws.io-rs/commit/4e882f7))
+- add some todo ([6bfd3f6](https://github.com/ws-io/ws.io-rs/commit/6bfd3f6))
+
+### 💅 Refactors
+
+- change `message_tx.send` to `try_send` in `connection.close` method ([100e2c6](https://github.com/ws-io/ws.io-rs/commit/100e2c6))
+- *(server)* [**breaking**] code cleanup and optimization ([3b1486e](https://github.com/ws-io/ws.io-rs/commit/3b1486e))
+- dynamically determine internal channel capacity during connection creation based on WebSocket config ([a7526f6](https://github.com/ws-io/ws.io-rs/commit/a7526f6))
+- spawn `on_ready_handler` execution and prevent connection interruption if it panics ([52eddc9](https://github.com/ws-io/ws.io-rs/commit/52eddc9))
+
+### 🩹 Fixes
+
+- *(server)* lint code ([72eac7c](https://github.com/ws-io/ws.io-rs/commit/72eac7c))
+- *(server)* ensure `connection.emit` only executes when connection status is `ready` ([98e151e](https://github.com/ws-io/ws.io-rs/commit/98e151e))
+
 ## [0.3.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.3.0...wsio-server-v0.3.1) - 2025-10-22 05:54
 
 ### 🏀 Examples

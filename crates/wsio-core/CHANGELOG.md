@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.2](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.1...wsio-core-v0.3.2) - 2025-10-23 07:04
+
+### 🏡 Chore
+
+- *(core)* remove some todo comments ([b2dcc04](https://github.com/ws-io/ws.io-rs/commit/b2dcc04))
+
+### 🚀 Enhancements
+
+- *(core)* add `abort_locked_task` utils ([e712702](https://github.com/ws-io/ws.io-rs/commit/e712702))
+- *(core)* add `is` method to `AtomicStatus` ([ac954e1](https://github.com/ws-io/ws.io-rs/commit/ac954e1))
+
 ## [0.3.1](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.0...wsio-core-v0.3.1) - 2025-10-22 05:54
 
 ### 🎨 Styles

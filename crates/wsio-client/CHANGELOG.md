@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.3.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.2.2...wsio-client-v0.3.0) - 2025-10-23 07:04
+
+### 🏡 Chore
+
+- [**breaking**] adjust default timeout durations ([4e882f7](https://github.com/ws-io/ws.io-rs/commit/4e882f7))
+- add some todo ([6bfd3f6](https://github.com/ws-io/ws.io-rs/commit/6bfd3f6))
+- *(client)* format code ([18ae855](https://github.com/ws-io/ws.io-rs/commit/18ae855))
+
+### 💅 Refactors
+
+- change `message_tx.send` to `try_send` in `connection.close` method ([100e2c6](https://github.com/ws-io/ws.io-rs/commit/100e2c6))
+- *(client)* [**breaking**] rename some config fields and add some config comments ([16503b5](https://github.com/ws-io/ws.io-rs/commit/16503b5))
+- *(client)* simplify `WsIoClientConnection` abort-timeout task logic using core utils ([344d718](https://github.com/ws-io/ws.io-rs/commit/344d718))
+- *(client)* merge duplicate code sections ([8640aeb](https://github.com/ws-io/ws.io-rs/commit/8640aeb))
+- *(client)* replace `matches!(self.status.get(), RuntimeStatus::Running)` with `self.status.is(RuntimeStatus::Running)` ([ad58649](https://github.com/ws-io/ws.io-rs/commit/ad58649))
+- *(client)* code cleanup and handler improvements ([9cac566](https://github.com/ws-io/ws.io-rs/commit/9cac566))
+- *(client)* clean up, simplify, and review status transition logic within runtime ([bcb2a80](https://github.com/ws-io/ws.io-rs/commit/bcb2a80))
+- *(client)* rename `WsIoClientRuntimeStatus` to `RuntimeStatus` ([eab14e3](https://github.com/ws-io/ws.io-rs/commit/eab14e3))
+- dynamically determine internal channel capacity during connection creation based on WebSocket config ([a7526f6](https://github.com/ws-io/ws.io-rs/commit/a7526f6))
+- spawn `on_ready_handler` execution and prevent connection interruption if it panics ([52eddc9](https://github.com/ws-io/ws.io-rs/commit/52eddc9))
+
+### 🚀 Enhancements
+
+- *(client)* add `WsIoClientConnection.spawn_task` method ([70b86bd](https://github.com/ws-io/ws.io-rs/commit/70b86bd))
+
+### 🩹 Fixes
+
+- *(client)* force abort the counterpart task when either `read_ws_stream_task` or `write_ws_stream_task` completes in `run_connection` ([5365513](https://github.com/ws-io/ws.io-rs/commit/5365513))
+- *(client)* spawn `disconnect` call after receiving `disconnect` packet to prevent potential deadlock ([dabb379](https://github.com/ws-io/ws.io-rs/commit/dabb379))
+- *(client)* immediately break `run_connection_loop` upon receiving `break_notify.notified` ([1310e0d](https://github.com/ws-io/ws.io-rs/commit/1310e0d))
+- *(client)* replace `ws_stream_writer.flush()` with `close` method ([0b25ad7](https://github.com/ws-io/ws.io-rs/commit/0b25ad7))
+
 ## [0.2.2](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.2.1...wsio-client-v0.2.2) - 2025-10-22 05:54
 
 ### 🏀 Examples
