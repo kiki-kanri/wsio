@@ -8,7 +8,10 @@ use futures_util::{
     StreamExt,
 };
 use http::HeaderMap;
-use hyper::upgrade::OnUpgrade;
+use hyper::upgrade::{
+    OnUpgrade,
+    Upgraded,
+};
 use hyper_util::rt::TokioIo;
 use tokio::{
     join,
@@ -52,6 +55,75 @@ impl WsIoServerNamespace {
         })
     }
 
+    // Private methods
+    async fn handle_upgraded_request(self: Arc<Self>, connection_sid: &str, headers: HeaderMap, upgraded: Upgraded) {
+        // Create ws stream
+        let ws_stream =
+            WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(self.config.websocket_config))
+                .await;
+
+        // Create connection
+        let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone(), connection_sid.to_string());
+
+        // Split ws stream and spawn read and write tasks
+        let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
+        let connection_clone = connection.clone();
+        let mut read_ws_stream_task = spawn(async move {
+            // TODO: FIFO message
+            while let Some(message) = ws_stream_reader.next().await {
+                if match message {
+                    Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
+                    Ok(Message::Close(_)) => break,
+                    Ok(Message::Text(text)) => connection_clone.handle_incoming_packet(text.as_bytes()).await,
+                    Err(_) => break,
+                    _ => Ok(()),
+                }
+                .is_err()
+                {
+                    break;
+                }
+            }
+        });
+
+        let mut write_ws_stream_task = spawn(async move {
+            while let Some(message) = message_rx.recv().await {
+                let is_close = matches!(message, Message::Close(_));
+                if ws_stream_writer.send(message).await.is_err() {
+                    break;
+                }
+
+                if is_close {
+                    let _ = ws_stream_writer.close().await;
+                    break;
+                }
+            }
+        });
+
+        // Try to init connection
+        match connection.init().await {
+            Ok(_) => {
+                // Wait for either read or write task to finish
+                select! {
+                    _ = &mut read_ws_stream_task => {
+                        write_ws_stream_task.abort();
+                    },
+                    _ = &mut write_ws_stream_task => {
+                        read_ws_stream_task.abort();
+                    },
+                }
+            }
+            Err(_) => {
+                // Close connection
+                read_ws_stream_task.abort();
+                connection.close();
+                let _ = join!(read_ws_stream_task, write_ws_stream_task);
+            }
+        }
+
+        // Cleanup connection
+        connection.cleanup().await;
+    }
+
     // Protected methods
 
     #[inline]
@@ -63,85 +135,21 @@ impl WsIoServerNamespace {
         })
     }
 
-    pub(crate) fn handle_on_upgrade_request(
-        self: &Arc<Self>,
-        headers: HeaderMap,
-        namespace: Arc<WsIoServerNamespace>,
-        on_upgrade: OnUpgrade,
-    ) {
+    #[inline]
+    pub(crate) fn handle_on_upgrade_request(self: &Arc<Self>, headers: HeaderMap, on_upgrade: OnUpgrade) {
         let connection_sid = ObjectId::new().to_string();
-        let runtime = self.clone();
+        let namespace = self.clone();
         self.connection_tasks.insert(
             connection_sid.clone(),
             spawn(async move {
                 if let Ok(upgraded) = on_upgrade.await {
-                    let ws_stream = WebSocketStream::from_raw_socket(
-                        TokioIo::new(upgraded),
-                        Role::Server,
-                        Some(namespace.config.websocket_config),
-                    )
-                    .await;
-
-                    let (connection, mut message_rx) =
-                        WsIoServerConnection::new(headers, namespace, connection_sid.clone());
-
-                    let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
-                    let connection_clone = connection.clone();
-                    let mut read_ws_stream_task = spawn(async move {
-                        // TODO: FIFO message
-                        while let Some(message) = ws_stream_reader.next().await {
-                            if match message {
-                                Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
-                                Ok(Message::Close(_)) => break,
-                                Ok(Message::Text(text)) => {
-                                    connection_clone.handle_incoming_packet(text.as_bytes()).await
-                                }
-                                Err(_) => break,
-                                _ => Ok(()),
-                            }
-                            .is_err()
-                            {
-                                break;
-                            }
-                        }
-                    });
-
-                    let mut write_ws_stream_task = spawn(async move {
-                        while let Some(message) = message_rx.recv().await {
-                            let is_close = matches!(message, Message::Close(_));
-                            if ws_stream_writer.send(message).await.is_err() {
-                                break;
-                            }
-
-                            if is_close {
-                                let _ = ws_stream_writer.close().await;
-                                break;
-                            }
-                        }
-                    });
-
-                    match connection.init().await {
-                        Ok(_) => {
-                            select! {
-                                _ = &mut read_ws_stream_task => {
-                                    write_ws_stream_task.abort();
-                                },
-                                _ = &mut write_ws_stream_task => {
-                                    read_ws_stream_task.abort();
-                                },
-                            }
-                        }
-                        Err(_) => {
-                            read_ws_stream_task.abort();
-                            connection.close();
-                            let _ = join!(read_ws_stream_task, write_ws_stream_task);
-                        }
-                    }
-
-                    connection.cleanup().await;
+                    namespace
+                        .clone()
+                        .handle_upgraded_request(&connection_sid, headers, upgraded)
+                        .await;
                 }
 
-                runtime.connection_tasks.remove(&connection_sid);
+                namespace.connection_tasks.remove(&connection_sid);
             }),
         );
     }
