@@ -69,7 +69,7 @@ impl WsIoServerNamespaceBuilder {
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.config.on_connect_handler = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self.config.on_connect_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
         self
     }
 
@@ -134,7 +134,7 @@ impl WsIoServerNamespaceBuilder {
         H: Fn(Arc<WsIoServerConnection>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.config.middleware = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self.config.middleware = Some(Box::new(move |connection| Box::pin(handler(connection))));
         self
     }
 }

@@ -1,7 +1,4 @@
-use std::{
-    pin::Pin,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use anyhow::{
     Result,
@@ -46,6 +43,7 @@ use crate::{
             WsIoPacket,
             WsIoPacketType,
         },
+        types::BoxAsyncUnaryResultHandler,
         utils::task::abort_locked_task,
     },
     namespace::WsIoServerNamespace,
@@ -63,13 +61,6 @@ enum ConnectionStatus {
     Ready,
 }
 
-type OnCloseHandler = Box<
-    dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
-        + Send
-        + Sync
-        + 'static,
->;
-
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: CancellationToken,
@@ -78,7 +69,7 @@ pub struct WsIoServerConnection {
     headers: HeaderMap,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
-    on_close_handler: Mutex<Option<OnCloseHandler>>,
+    on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
     sid: String,
     status: AtomicStatus<ConnectionStatus>,
 }

@@ -10,18 +10,17 @@ use url::Url;
 
 use crate::{
     connection::WsIoClientConnection,
-    core::packet::codecs::WsIoPacketCodec,
+    core::{
+        packet::codecs::WsIoPacketCodec,
+        types::{
+            ArcAsyncUnaryResultHandler,
+            BoxAsyncUnaryResultHandler,
+        },
+    },
 };
 
 type AuthHandler = Box<
     dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'static>>
-        + Send
-        + Sync
-        + 'static,
->;
-
-type OnlyConnectionParamHandler = Arc<
-    dyn Fn(Arc<WsIoClientConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
         + Sync
         + 'static,
@@ -38,12 +37,12 @@ pub(crate) struct WsIoClientConfig {
     /// Maximum duration to wait for the client to send the init packet.
     pub(crate) init_packet_timeout: Duration,
 
-    pub(crate) on_connection_close_handler: Option<OnlyConnectionParamHandler>,
+    pub(crate) on_connection_close_handler: Option<BoxAsyncUnaryResultHandler<WsIoClientConnection>>,
 
     /// Maximum duration allowed for the on_connection_close handler to execute.
     pub(crate) on_connection_close_handler_timeout: Duration,
 
-    pub(crate) on_connection_ready_handler: Option<OnlyConnectionParamHandler>,
+    pub(crate) on_connection_ready_handler: Option<ArcAsyncUnaryResultHandler<WsIoClientConnection>>,
 
     pub(crate) packet_codec: WsIoPacketCodec,
 

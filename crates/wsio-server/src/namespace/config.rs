@@ -9,18 +9,17 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::{
     connection::WsIoServerConnection,
-    core::packet::codecs::WsIoPacketCodec,
+    core::{
+        packet::codecs::WsIoPacketCodec,
+        types::{
+            ArcAsyncUnaryResultHandler,
+            BoxAsyncUnaryResultHandler,
+        },
+    },
 };
 
 type AuthHandler = Box<
     dyn for<'a> Fn(Arc<WsIoServerConnection>, Option<&'a [u8]>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
-        + Send
-        + Sync
-        + 'static,
->;
-
-type OnlyConnectionParamHandler = Arc<
-    dyn Fn(Arc<WsIoServerConnection>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
         + Sync
         + 'static,
@@ -35,7 +34,7 @@ pub(crate) struct WsIoServerNamespaceConfig {
     /// Maximum duration to wait for the client to send the auth packet.
     pub(crate) auth_packet_timeout: Duration,
 
-    pub(crate) middleware: Option<OnlyConnectionParamHandler>,
+    pub(crate) middleware: Option<BoxAsyncUnaryResultHandler<WsIoServerConnection>>,
 
     /// Maximum duration allowed for middleware execution.
     pub(crate) middleware_execution_timeout: Duration,
@@ -46,9 +45,9 @@ pub(crate) struct WsIoServerNamespaceConfig {
     /// Maximum duration allowed for the on_connect handler to execute.
     pub(crate) on_connect_handler_timeout: Duration,
 
-    pub(crate) on_connect_handler: Option<OnlyConnectionParamHandler>,
+    pub(crate) on_connect_handler: Option<BoxAsyncUnaryResultHandler<WsIoServerConnection>>,
 
-    pub(crate) on_ready_handler: Option<OnlyConnectionParamHandler>,
+    pub(crate) on_ready_handler: Option<ArcAsyncUnaryResultHandler<WsIoServerConnection>>,
 
     pub(crate) packet_codec: WsIoPacketCodec,
 
