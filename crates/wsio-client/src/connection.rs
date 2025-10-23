@@ -81,7 +81,8 @@ impl WsIoClientConnection {
 
     // Private methods
     async fn handle_disconnect_packet(&self) -> Result<()> {
-        let _ = self.runtime.disconnect().await;
+        let runtime = self.runtime.clone();
+        spawn(async move { runtime.disconnect().await });
         Ok(())
     }
 
