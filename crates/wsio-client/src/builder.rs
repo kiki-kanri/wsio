@@ -53,9 +53,11 @@ impl WsIoClientBuilder {
         Ok(Self {
             config: WsIoClientConfig {
                 auth_handler: None,
+                auth_handler_timeout: Duration::from_secs(5),
                 connect_url: url,
                 init_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
+                on_connection_close_handler_timeout: Duration::from_secs(3),
                 on_connection_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
                 ready_timeout: Duration::from_secs(3),
@@ -91,6 +93,11 @@ impl WsIoClientBuilder {
         self
     }
 
+    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.auth_handler_timeout = duration;
+        self
+    }
+
     pub fn build(self) -> WsIoClient {
         WsIoClient(WsIoClientRuntime::new(self.config))
     }
@@ -106,6 +113,11 @@ impl WsIoClientBuilder {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.config.on_connection_close_handler = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self
+    }
+
+    pub fn on_connection_close_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_connection_close_handler_timeout = duration;
         self
     }
 
