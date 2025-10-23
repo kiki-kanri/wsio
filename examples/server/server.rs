@@ -14,6 +14,7 @@ use axum::{
 use kikiutils::{
     signal::wait_for_shutdown_signal,
     task::manager::TaskManager,
+    tracing::init_tracing_with_local_time_format,
 };
 use tikv_jemallocator::Jemalloc;
 use tokio::net::TcpListener;
@@ -31,7 +32,7 @@ static WS_IO_SERVER: LazyLock<WsIoServer> = LazyLock::new(|| WsIoServer::builder
 
 // Functions
 async fn on_close(connection: Arc<WsIoServerConnection>) -> Result<()> {
-    println!(
+    tracing::info!(
         "{}: on_close, sid: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
         connection.sid(),
@@ -43,7 +44,7 @@ async fn on_close(connection: Arc<WsIoServerConnection>) -> Result<()> {
 }
 
 async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
-    println!(
+    tracing::info!(
         "{}: on_connect, sid: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
         connection.sid(),
@@ -56,7 +57,7 @@ async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
 }
 
 async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
-    println!(
+    tracing::info!(
         "{}: on_ready, sid: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
         connection.sid(),
@@ -69,7 +70,8 @@ async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("pid: {}", id());
+    let _ = init_tracing_with_local_time_format();
+    tracing::info!("pid: {}", id());
 
     // Register /auth namespace
     WS_IO_SERVER
@@ -128,13 +130,13 @@ async fn main() -> Result<()> {
         .packet_codec(WsIoPacketCodec::SonicRs)
         .register()?;
 
-    println!("Namespace count: {}", WS_IO_SERVER.namespace_count());
+    tracing::info!("Namespace count: {}", WS_IO_SERVER.namespace_count());
     let ws_io_layer = WS_IO_SERVER.layer();
     let app = Router::new().layer(ws_io_layer);
     let listener = TcpListener::bind(("127.0.0.1", 8000)).await?;
-    println!("Listening on {}", listener.local_addr().unwrap());
+    tracing::info!("Listening on {}", listener.local_addr().unwrap());
     MAIN_TASK_MANAGER.spawn_with_token(async move |token| {
-        println!("Started");
+        tracing::info!("Started");
         let _ = serve(listener, app)
             .with_graceful_shutdown(async move { token.cancelled().await })
             .await;
@@ -142,6 +144,6 @@ async fn main() -> Result<()> {
 
     let _ = wait_for_shutdown_signal().await;
     MAIN_TASK_MANAGER.cancel_and_join_existing().await;
-    println!("Stopped");
+    tracing::info!("Stopped");
     Ok(())
 }
