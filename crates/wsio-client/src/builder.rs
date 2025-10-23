@@ -53,11 +53,11 @@ impl WsIoClientBuilder {
         Ok(Self {
             config: WsIoClientConfig {
                 auth_handler: None,
-                auth_handler_timeout: Duration::from_secs(5),
+                auth_handler_timeout: Duration::from_secs(3),
                 connect_url: url,
                 init_packet_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
-                on_connection_close_handler_timeout: Duration::from_secs(3),
+                on_connection_close_handler_timeout: Duration::from_secs(2),
                 on_connection_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
                 ready_packet_timeout: Duration::from_secs(3),
