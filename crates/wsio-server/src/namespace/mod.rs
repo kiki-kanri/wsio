@@ -87,7 +87,7 @@ impl WsIoServerNamespace {
 
                     let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
                     let connection_clone = connection.clone();
-                    let read_ws_stream_task = spawn(async move {
+                    let mut read_ws_stream_task = spawn(async move {
                         // TODO: FIFO message
                         while let Some(message) = ws_stream_reader.next().await {
                             if match message {
@@ -106,7 +106,7 @@ impl WsIoServerNamespace {
                         }
                     });
 
-                    let write_ws_stream_task = spawn(async move {
+                    let mut write_ws_stream_task = spawn(async move {
                         while let Some(message) = message_rx.recv().await {
                             let is_close = matches!(message, Message::Close(_));
                             if ws_stream_writer.send(message).await.is_err() {
@@ -123,9 +123,12 @@ impl WsIoServerNamespace {
                     match connection.init().await {
                         Ok(_) => {
                             select! {
-                                // TODO: timeout wait read task
-                                _ = read_ws_stream_task => {},
-                                _ = write_ws_stream_task => {},
+                                _ = &mut read_ws_stream_task => {
+                                    write_ws_stream_task.abort();
+                                },
+                                _ = &mut write_ws_stream_task => {
+                                    read_ws_stream_task.abort();
+                                },
                             }
                         }
                         Err(_) => {

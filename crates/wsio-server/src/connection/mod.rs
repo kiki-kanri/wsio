@@ -25,7 +25,10 @@ use tokio::{
         },
     },
     task::JoinHandle,
-    time::sleep,
+    time::{
+        sleep,
+        timeout,
+    },
 };
 use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
@@ -43,6 +46,7 @@ use crate::{
             WsIoPacket,
             WsIoPacketType,
         },
+        utils::task::abort_locked_task,
     },
     namespace::WsIoServerNamespace,
 };
@@ -108,13 +112,8 @@ impl WsIoServerConnection {
     }
 
     // Private methods
-    async fn abort_auth_timeout_task(&self) {
-        if let Some(auth_timeout_task) = self.auth_timeout_task.lock().await.take() {
-            auth_timeout_task.abort();
-        }
-    }
-
     async fn activate(self: &Arc<Self>) -> Result<()> {
+        // Verify current state; only valid from Authenticating or Created → Activating
         let status = self.status.get();
         match status {
             ConnectionStatus::Authenticating | ConnectionStatus::Created => {
@@ -123,15 +122,32 @@ impl WsIoServerConnection {
             _ => bail!("Cannot activate connection in invalid status: {:#?}", status),
         }
 
+        // Invoke middleware with timeout protection if configured
         if let Some(middleware) = &self.namespace.config.middleware {
-            middleware(self.clone()).await?;
+            timeout(
+                self.namespace.config.middleware_execution_timeout,
+                middleware(self.clone()),
+            )
+            .await??;
         }
 
+        // Invoke on_connect handler with timeout protection if configured
         if let Some(on_connect_handler) = &self.namespace.config.on_connect_handler {
-            on_connect_handler(self.clone()).await?;
+            timeout(
+                self.namespace.config.on_connect_handler_timeout,
+                on_connect_handler(self.clone()),
+            )
+            .await??;
         }
 
+        // Insert connection into namespace
         self.namespace.insert_connection(self.clone());
+
+        // Transition state to Ready
+        self.status
+            .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
+
+        // Send ready packet
         self.send_packet(&WsIoPacket {
             data: None,
             key: None,
@@ -139,10 +155,9 @@ impl WsIoServerConnection {
         })
         .await?;
 
-        self.status
-            .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
-
+        // Invoke on_ready handler if configured
         if let Some(on_ready_handler) = self.namespace.config.on_ready_handler.clone() {
+            // Run handler asynchronously in a detached task
             let connection = self.clone();
             self.spawn_task(async move { on_ready_handler(connection).await });
         }
@@ -151,16 +166,25 @@ impl WsIoServerConnection {
     }
 
     async fn handle_auth_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
+        // Verify current state; only valid from AwaitingAuth → Authenticating
         let status = self.status.get();
         match status {
             ConnectionStatus::AwaitingAuth => self.status.try_transition(status, ConnectionStatus::Authenticating)?,
             _ => bail!("Received auth packet in invalid status: {:#?}", status),
         }
 
+        // Abort auth-timeout task if still active
+        abort_locked_task(&self.auth_timeout_task).await;
+
+        // Invoke auth handler with timeout protection if configured, otherwise raise error
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
-            // TODO: exec handler timeout?
-            (auth_handler)(self.clone(), packet_data).await?;
-            self.abort_auth_timeout_task().await;
+            timeout(
+                self.namespace.config.auth_handler_timeout,
+                (auth_handler)(self.clone(), packet_data),
+            )
+            .await??;
+
+            // Activate connection
             self.activate().await
         } else {
             bail!("Auth packet received but no auth handler is configured");
@@ -176,23 +200,39 @@ impl WsIoServerConnection {
 
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
+        // Set connection state to Closing
         self.status.store(ConnectionStatus::Closing);
-        self.abort_auth_timeout_task().await;
+
+        // Abort auth-timeout task if still active
+        abort_locked_task(&self.auth_timeout_task).await;
+
+        // Remove connection from namespace
         self.namespace.remove_connection(&self.sid);
+
+        // Cancel all ongoing operations via cancel token
         self.cancel_token.cancel();
+
+        // Invoke on_close handler with timeout protection if configured
         if let Some(on_close_handler) = self.on_close_handler.lock().await.take() {
-            let _ = on_close_handler(self.clone()).await;
+            let _ = timeout(
+                self.namespace.config.on_close_handler_timeout,
+                on_close_handler(self.clone()),
+            )
+            .await;
         }
 
+        // Set connection state to Closed
         self.status.store(ConnectionStatus::Closed);
     }
 
     pub(crate) async fn close(&self) {
+        // Skip if connection is already Closing or Closed, otherwise set connection state to Closing
         match self.status.get() {
             ConnectionStatus::Closed | ConnectionStatus::Closing => return,
             _ => self.status.store(ConnectionStatus::Closing),
         }
 
+        // Send websocket close frame to initiate graceful shutdown
         let _ = self.message_tx.send(Message::Close(None)).await;
     }
 
@@ -205,26 +245,44 @@ impl WsIoServerConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
-        let require_auth = self.namespace.config.auth_handler.is_some();
+        // Verify current state; only valid Created
+        let status = self.status.get();
+        if !matches!(status, ConnectionStatus::Created) {
+            bail!("Cannot init connection in invalid status: {:#?}", status);
+        }
+
+        // Determine if authentication is required
+        let requires_auth = self.namespace.config.auth_handler.is_some();
+
+        // Build Init packet to inform client whether auth is required
         let packet = WsIoPacket {
-            data: Some(self.namespace.config.packet_codec.encode_data(&require_auth)?),
+            data: Some(self.namespace.config.packet_codec.encode_data(&requires_auth)?),
             key: None,
             r#type: WsIoPacketType::Init,
         };
 
-        if require_auth {
-            self.status.store(ConnectionStatus::AwaitingAuth);
+        // If authentication is required
+        if requires_auth {
+            // Transition state to AwaitingAuth
+            self.status
+                .try_transition(ConnectionStatus::Created, ConnectionStatus::AwaitingAuth)?;
+
+            // Spawn auth-packet-timeout watchdog to close connection if auth not received in time
             let connection = self.clone();
             *self.auth_timeout_task.lock().await = Some(spawn(async move {
-                sleep(connection.namespace.config.auth_timeout).await;
-                if matches!(connection.status.get(), ConnectionStatus::AwaitingAuth) {
+                sleep(connection.namespace.config.auth_packet_timeout).await;
+                if connection.status.is(ConnectionStatus::AwaitingAuth) {
                     connection.close().await;
                 }
             }));
 
+            // Send Init packet to client (expecting auth response)
             self.send_packet(&packet).await
         } else {
+            // Send Init packet to client (no auth required)
             self.send_packet(&packet).await?;
+
+            // Immediately activate connection
             self.activate().await
         }
     }
