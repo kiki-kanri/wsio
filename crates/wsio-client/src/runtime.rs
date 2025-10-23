@@ -97,7 +97,7 @@ impl WsIoClientRuntime {
         }
 
         if let Some(connection) = self.connection.load_full() {
-            connection.close().await;
+            connection.close();
         }
 
         if let Some(connection_loop_task) = self.connection_loop_task.lock().await.take() {

@@ -132,8 +132,8 @@ impl WsIoServerNamespace {
                             }
                         }
                         Err(_) => {
-                            connection.close().await;
                             read_ws_stream_task.abort();
+                            connection.close();
                             let _ = join!(read_ws_stream_task, write_ws_stream_task);
                         }
                     }

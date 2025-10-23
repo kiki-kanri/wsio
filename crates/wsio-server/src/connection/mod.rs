@@ -225,7 +225,8 @@ impl WsIoServerConnection {
         self.status.store(ConnectionStatus::Closed);
     }
 
-    pub(crate) async fn close(&self) {
+    #[inline]
+    pub(crate) fn close(&self) {
         // Skip if connection is already Closing or Closed, otherwise set connection state to Closing
         match self.status.get() {
             ConnectionStatus::Closed | ConnectionStatus::Closing => return,
@@ -233,7 +234,7 @@ impl WsIoServerConnection {
         }
 
         // Send websocket close frame to initiate graceful shutdown
-        let _ = self.message_tx.send(Message::Close(None)).await;
+        let _ = self.message_tx.try_send(Message::Close(None));
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
@@ -272,7 +273,7 @@ impl WsIoServerConnection {
             *self.auth_timeout_task.lock().await = Some(spawn(async move {
                 sleep(connection.namespace.config.auth_packet_timeout).await;
                 if connection.status.is(ConnectionStatus::AwaitingAuth) {
-                    connection.close().await;
+                    connection.close();
                 }
             }));
 
@@ -303,7 +304,7 @@ impl WsIoServerConnection {
             })
             .await;
 
-        self.close().await
+        self.close()
     }
 
     pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {

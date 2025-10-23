@@ -113,7 +113,7 @@ impl WsIoClientConnection {
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.ready_packet_timeout).await;
             if connection.status.is(ConnectionStatus::AwaitingReady) {
-                connection.close().await;
+                connection.close();
             }
         }));
 
@@ -194,7 +194,8 @@ impl WsIoClientConnection {
         self.status.store(ConnectionStatus::Closed);
     }
 
-    pub(crate) async fn close(&self) {
+    #[inline]
+    pub(crate) fn close(&self) {
         // Skip if connection is already Closing or Closed, otherwise set connection state to Closing
         match self.status.get() {
             ConnectionStatus::Closed | ConnectionStatus::Closing => return,
@@ -202,7 +203,7 @@ impl WsIoClientConnection {
         }
 
         // Send websocket close frame to initiate graceful shutdown
-        let _ = self.message_tx.send(Message::Close(None)).await;
+        let _ = self.message_tx.try_send(Message::Close(None));
     }
 
     // TODO: fifo?
@@ -228,7 +229,7 @@ impl WsIoClientConnection {
         *self.init_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.init_packet_timeout).await;
             if connection.status.is(ConnectionStatus::AwaitingInit) {
-                connection.close().await;
+                connection.close();
             }
         }));
     }
