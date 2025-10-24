@@ -157,7 +157,7 @@ impl WsIoServerNamespace {
     #[inline]
     pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
         self.connections.insert(connection.sid().into(), connection.clone());
-        self.runtime.insert_connection(connection);
+        self.runtime.insert_connection(&connection);
     }
 
     #[inline]

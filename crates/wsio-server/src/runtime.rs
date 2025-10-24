@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    Weak,
+};
 
 use anyhow::{
     Result,
@@ -17,7 +20,7 @@ use crate::{
 
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
-    connections: DashMap<String, Arc<WsIoServerConnection>>,
+    connections: DashMap<String, Weak<WsIoServerConnection>>,
     namespaces: DashMap<String, Arc<WsIoServerNamespace>>,
 }
 
@@ -43,8 +46,9 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
-        self.connections.insert(connection.sid().into(), connection);
+    pub(crate) fn insert_connection(&self, connection: &Arc<WsIoServerConnection>) {
+        self.connections
+            .insert(connection.sid().into(), Arc::downgrade(connection));
     }
 
     #[inline]
