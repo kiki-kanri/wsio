@@ -56,7 +56,7 @@ impl WsIoServerNamespace {
     }
 
     // Private methods
-    async fn handle_upgraded_request(self: Arc<Self>, connection_sid: &str, headers: HeaderMap, upgraded: Upgraded) {
+    async fn handle_upgraded_request(self: &Arc<Self>, connection_sid: &str, headers: HeaderMap, upgraded: Upgraded) {
         // Create ws stream
         let ws_stream =
             WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(self.config.websocket_config))
