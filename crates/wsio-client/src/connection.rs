@@ -209,7 +209,6 @@ impl WsIoClientConnection {
         let _ = self.message_tx.try_send(Message::Close(None));
     }
 
-    // TODO: fifo?
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
         let packet = self.runtime.config.packet_codec.decode(bytes)?;
         match packet.r#type {
