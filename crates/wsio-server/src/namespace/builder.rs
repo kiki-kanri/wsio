@@ -117,10 +117,7 @@ impl WsIoServerNamespaceBuilder {
         let handler = Arc::new(handler);
         self.config.auth_handler = Some(Box::new(move |connection, bytes, packet_codec| {
             let handler = handler.clone();
-            Box::pin(async move {
-                let data = packet_codec.decode_data(bytes)?;
-                handler(connection, &data).await
-            })
+            Box::pin(async move { handler(connection, &packet_codec.decode_data(bytes)?).await })
         }));
 
         self
