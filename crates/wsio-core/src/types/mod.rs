@@ -5,8 +5,8 @@ use std::{
 
 use anyhow::Result;
 
-type AsyncUnaryResultHandler<P> =
-    dyn Fn(Arc<P>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> + Send + Sync + 'static;
+type AsyncUnaryResultHandler<P, R = ()> =
+    dyn Fn(Arc<P>) -> Pin<Box<dyn Future<Output = Result<R>> + Send + 'static>> + Send + Sync + 'static;
 
-pub type ArcAsyncUnaryResultHandler<P> = Arc<AsyncUnaryResultHandler<P>>;
-pub type BoxAsyncUnaryResultHandler<P> = Box<AsyncUnaryResultHandler<P>>;
+pub type ArcAsyncUnaryResultHandler<P, R = ()> = Arc<AsyncUnaryResultHandler<P, R>>;
+pub type BoxAsyncUnaryResultHandler<P, R = ()> = Box<AsyncUnaryResultHandler<P, R>>;

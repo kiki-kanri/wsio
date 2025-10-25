@@ -73,21 +73,16 @@ impl WsIoClientBuilder {
     }
 
     // Public methods
-    pub fn auth<D, H, Fut>(mut self, handler: H) -> WsIoClientBuilder
+    pub fn auth<H, Fut, D>(mut self, handler: H) -> WsIoClientBuilder
     where
         D: Serialize,
         H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Option<D>>> + Send + 'static,
+        Fut: Future<Output = Result<D>> + Send + 'static,
     {
         let handler = Arc::new(handler);
         self.config.auth_handler = Some(Box::new(move |connection| {
             let handler = handler.clone();
-            Box::pin(async move {
-                handler(connection)
-                    .await?
-                    .map(|data| self.config.packet_codec.encode_data(&data))
-                    .transpose()
-            })
+            Box::pin(async move { self.config.packet_codec.encode_data(&handler(connection).await?) })
         }));
 
         self

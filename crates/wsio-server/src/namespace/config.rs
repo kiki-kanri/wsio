@@ -19,7 +19,7 @@ use crate::{
 };
 
 type AuthHandler = Box<
-    dyn for<'a> Fn(Arc<WsIoServerConnection>, Option<&'a [u8]>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
+    dyn for<'a> Fn(Arc<WsIoServerConnection>, &'a [u8]) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
         + Send
         + Sync
         + 'static,

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::{
     Result,
-    anyhow,
     bail,
 };
 use num_enum::{
@@ -127,7 +126,7 @@ impl WsIoClientConnection {
                 // Send Auth packet only if still in AwaitingReady state
                 if self.status.is(ConnectionStatus::AwaitingReady) {
                     self.send_packet(&WsIoPacket {
-                        data: auth_data,
+                        data: Some(auth_data),
                         key: None,
                         r#type: WsIoPacketType::Auth,
                     })
@@ -215,7 +214,7 @@ impl WsIoClientConnection {
                 if let Some(packet_data) = packet.data.as_deref() {
                     self.handle_init_packet(packet_data).await
                 } else {
-                    Err(anyhow!("Init packet missing data"))
+                    bail!("Init packet missing data");
                 }
             }
             WsIoPacketType::Ready => self.handle_ready_packet().await,

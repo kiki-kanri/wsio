@@ -156,7 +156,7 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    async fn handle_auth_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
+    async fn handle_auth_packet(self: &Arc<Self>, packet_data: &[u8]) -> Result<()> {
         // Verify current state; only valid from AwaitingAuth → Authenticating
         let status = self.status.get();
         match status {
@@ -171,7 +171,7 @@ impl WsIoServerConnection {
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
             timeout(
                 self.namespace.config.auth_handler_timeout,
-                (auth_handler)(self.clone(), packet_data),
+                auth_handler(self.clone(), packet_data),
             )
             .await??;
 
@@ -231,7 +231,13 @@ impl WsIoServerConnection {
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
         let packet = self.namespace.config.packet_codec.decode(bytes)?;
         match packet.r#type {
-            WsIoPacketType::Auth => self.handle_auth_packet(packet.data.as_deref()).await,
+            WsIoPacketType::Auth => {
+                if let Some(packet_data) = packet.data.as_deref() {
+                    self.handle_auth_packet(packet_data).await
+                } else {
+                    bail!("Auth packet missing data");
+                }
+            }
             _ => Ok(()),
         }
     }
