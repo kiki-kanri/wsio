@@ -41,10 +41,7 @@ use crate::{
     connection::WsIoServerConnection,
     core::{
         atomic::status::AtomicStatus,
-        packet::{
-            WsIoPacket,
-            WsIoPacketType,
-        },
+        packet::WsIoPacket,
     },
     runtime::{
         WsIoServerRuntime,
@@ -94,11 +91,7 @@ impl WsIoServerNamespace {
         // Check runtime and namespace status
         if !self.runtime.status.is(WsIoServerRuntimeStatus::Running) || !self.status.is(NamespaceStatus::Running) {
             ws_stream
-                .send(self.encode_packet_to_message(&WsIoPacket {
-                    data: None,
-                    key: None,
-                    r#type: WsIoPacketType::Disconnect,
-                })?)
+                .send(self.encode_packet_to_message(&WsIoPacket::new_disconnect())?)
                 .await?;
 
             let _ = ws_stream.close(None).await;

@@ -32,3 +32,32 @@ pub struct WsIoPacket {
     #[serde(rename = "t")]
     pub r#type: WsIoPacketType,
 }
+
+impl WsIoPacket {
+    #[inline]
+    pub fn new(r#type: WsIoPacketType, key: Option<String>, data: Option<Vec<u8>>) -> Self {
+        Self { data, key, r#type }
+    }
+
+    // Public methods
+
+    #[inline]
+    pub fn new_disconnect() -> Self {
+        Self::new(WsIoPacketType::Disconnect, None, None)
+    }
+
+    #[inline]
+    pub fn new_event(event: impl Into<String>, data: Option<Vec<u8>>) -> Self {
+        Self::new(WsIoPacketType::Event, Some(event.into()), data)
+    }
+
+    #[inline]
+    pub fn new_init(data: Vec<u8>) -> Self {
+        Self::new(WsIoPacketType::Init, None, Some(data))
+    }
+
+    #[inline]
+    pub fn new_ready() -> Self {
+        Self::new(WsIoPacketType::Ready, None, None)
+    }
+}

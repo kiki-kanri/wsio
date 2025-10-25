@@ -31,6 +31,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     core::{
         atomic::status::AtomicStatus,
+        channel_capacity_from_websocket_config,
         packet::{
             WsIoPacket,
             WsIoPacketType,
@@ -63,11 +64,9 @@ pub struct WsIoClientConnection {
 }
 
 impl WsIoClientConnection {
+    #[inline]
     pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
-        let channel_capacity = (runtime.config.websocket_config.max_write_buffer_size
-            / runtime.config.websocket_config.write_buffer_size)
-            .clamp(64, 4096);
-
+        let channel_capacity = channel_capacity_from_websocket_config(runtime.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
@@ -129,12 +128,8 @@ impl WsIoClientConnection {
 
                 // Send Auth packet only if still in AwaitingReady state
                 if self.status.is(ConnectionStatus::AwaitingReady) {
-                    self.send_packet(&WsIoPacket {
-                        data: Some(auth_data),
-                        key: None,
-                        r#type: WsIoPacketType::Auth,
-                    })
-                    .await?;
+                    self.send_packet(&WsIoPacket::new(WsIoPacketType::Auth, None, Some(auth_data)))
+                        .await?;
                 }
             } else {
                 bail!("Auth required but no auth handler is configured");

@@ -8,11 +8,12 @@ use std::{
 
 use dashmap::DashMap;
 
-pub struct WsIoServerConnectionExtensions {
+pub struct ConnectionExtensions {
     inner: DashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
 
-impl WsIoServerConnectionExtensions {
+impl ConnectionExtensions {
+    #[inline]
     pub(super) fn new() -> Self {
         Self { inner: DashMap::new() }
     }

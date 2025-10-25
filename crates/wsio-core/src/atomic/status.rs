@@ -17,6 +17,7 @@ pub struct AtomicStatus<T: Into<u8> + TryFrom<u8>> {
 }
 
 impl<T: Into<u8> + TryFrom<u8>> AtomicStatus<T> {
+    #[inline]
     pub fn new(status: T) -> Self {
         Self {
             _marker: PhantomData,

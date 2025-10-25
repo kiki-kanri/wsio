@@ -39,10 +39,8 @@ use crate::{
     connection::WsIoClientConnection,
     core::{
         atomic::status::AtomicStatus,
-        packet::{
-            WsIoPacket,
-            WsIoPacketType,
-        },
+        channel_capacity_from_websocket_config,
+        packet::WsIoPacket,
     },
 };
 
@@ -69,7 +67,8 @@ pub(crate) struct WsIoClientRuntime {
 
 impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
-        let (event_message_send_tx, event_message_send_rx) = channel(512);
+        let channel_capacity = channel_capacity_from_websocket_config(config.websocket_config);
+        let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
         Arc::new(Self {
             config,
             connection: ArcSwapOption::new(None),
@@ -97,7 +96,25 @@ impl WsIoClientRuntime {
 
         // Create connection loop task
         let runtime = self.clone();
-        *self.connection_loop_task.lock().await = Some(spawn(async move { runtime.run_connection_loop().await }));
+        *self.connection_loop_task.lock().await = Some(spawn(async move {
+            loop {
+                if !runtime.status.is(RuntimeStatus::Running) {
+                    break;
+                }
+
+                let _ = runtime.run_connection().await;
+                if runtime.status.is(RuntimeStatus::Running) {
+                    select! {
+                        _ = runtime.wake_reconnect_wait_notify.notified() => {
+                            break;
+                        },
+                        _ = sleep(runtime.config.reconnection_delay) => {},
+                    }
+                } else {
+                    break;
+                }
+            }
+        }));
 
         // Create flush messages task
         let runtime = self.clone();
@@ -152,7 +169,7 @@ impl WsIoClientRuntime {
         self.status.store(RuntimeStatus::Stopped);
     }
 
-    pub async fn emit<D: Serialize>(&self, event: String, data: Option<&D>) -> Result<()> {
+    pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
         let status = self.status.get();
         if status != RuntimeStatus::Running {
             bail!("Cannot emit event in invalid status: {:#?}", status);
@@ -160,13 +177,11 @@ impl WsIoClientRuntime {
 
         self.event_message_send_tx
             .send(
-                self.encode_packet_to_message(&WsIoPacket {
-                    data: data
-                        .map(|data| self.config.packet_codec.encode_data(data))
+                self.encode_packet_to_message(&WsIoPacket::new_event(
+                    event,
+                    data.map(|data| self.config.packet_codec.encode_data(data))
                         .transpose()?,
-                    key: Some(event.to_string()),
-                    r#type: WsIoPacketType::Event,
-                })?,
+                ))?,
             )
             .await?;
 
@@ -238,25 +253,5 @@ impl WsIoClientRuntime {
         self.connection.store(None);
         connection.cleanup().await;
         Ok(())
-    }
-
-    pub(crate) async fn run_connection_loop(self: &Arc<Self>) {
-        loop {
-            if !self.status.is(RuntimeStatus::Running) {
-                break;
-            }
-
-            let _ = self.run_connection().await;
-            if self.status.is(RuntimeStatus::Running) {
-                select! {
-                    _ = self.wake_reconnect_wait_notify.notified() => {
-                        break;
-                    },
-                    _ = sleep(self.config.reconnection_delay) => {},
-                }
-            } else {
-                break;
-            }
-        }
     }
 }

@@ -34,11 +34,12 @@ use tokio_util::sync::CancellationToken;
 mod extensions;
 
 #[cfg(feature = "connection-extensions")]
-use self::extensions::WsIoServerConnectionExtensions;
+use self::extensions::ConnectionExtensions;
 use crate::{
     WsIoServer,
     core::{
         atomic::status::AtomicStatus,
+        channel_capacity_from_websocket_config,
         packet::{
             WsIoPacket,
             WsIoPacketType,
@@ -65,7 +66,7 @@ pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: CancellationToken,
     #[cfg(feature = "connection-extensions")]
-    extensions: WsIoServerConnectionExtensions,
+    extensions: ConnectionExtensions,
     headers: HeaderMap,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
@@ -75,22 +76,20 @@ pub struct WsIoServerConnection {
 }
 
 impl WsIoServerConnection {
+    #[inline]
     pub(crate) fn new(
         headers: HeaderMap,
         namespace: Arc<WsIoServerNamespace>,
         sid: String,
     ) -> (Arc<Self>, Receiver<Message>) {
-        let channel_capacity = (namespace.config.websocket_config.max_write_buffer_size
-            / namespace.config.websocket_config.write_buffer_size)
-            .clamp(64, 4096);
-
+        let channel_capacity = channel_capacity_from_websocket_config(namespace.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
                 cancel_token: CancellationToken::new(),
                 #[cfg(feature = "connection-extensions")]
-                extensions: WsIoServerConnectionExtensions::new(),
+                extensions: ConnectionExtensions::new(),
                 headers,
                 message_tx,
                 namespace,
@@ -139,12 +138,7 @@ impl WsIoServerConnection {
             .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
 
         // Send ready packet
-        self.send_packet(&WsIoPacket {
-            data: None,
-            key: None,
-            r#type: WsIoPacketType::Ready,
-        })
-        .await?;
+        self.send_packet(&WsIoPacket::new_ready()).await?;
 
         // Invoke on_ready handler if configured
         if let Some(on_ready_handler) = self.namespace.config.on_ready_handler.clone() {
@@ -253,11 +247,7 @@ impl WsIoServerConnection {
         let requires_auth = self.namespace.config.auth_handler.is_some();
 
         // Build Init packet to inform client whether auth is required
-        let packet = WsIoPacket {
-            data: Some(self.namespace.config.packet_codec.encode_data(&requires_auth)?),
-            key: None,
-            r#type: WsIoPacketType::Init,
-        };
+        let packet = &WsIoPacket::new_init(self.namespace.config.packet_codec.encode_data(&requires_auth)?);
 
         // If authentication is required
         if requires_auth {
@@ -275,10 +265,10 @@ impl WsIoServerConnection {
             }));
 
             // Send Init packet to client (expecting auth response)
-            self.send_packet(&packet).await
+            self.send_packet(packet).await
         } else {
             // Send Init packet to client (no auth required)
-            self.send_packet(&packet).await?;
+            self.send_packet(packet).await?;
 
             // Immediately activate connection
             self.activate().await
@@ -293,14 +283,7 @@ impl WsIoServerConnection {
     }
 
     pub async fn disconnect(&self) {
-        let _ = self
-            .send_packet(&WsIoPacket {
-                data: None,
-                key: None,
-                r#type: WsIoPacketType::Disconnect,
-            })
-            .await;
-
+        let _ = self.send_packet(&WsIoPacket::new_disconnect()).await;
         self.close()
     }
 
@@ -310,19 +293,17 @@ impl WsIoServerConnection {
             bail!("Cannot emit event in invalid status: {:#?}", status);
         }
 
-        self.send_packet(&WsIoPacket {
-            data: data
-                .map(|data| self.namespace.config.packet_codec.encode_data(data))
+        self.send_packet(&WsIoPacket::new_event(
+            event,
+            data.map(|data| self.namespace.config.packet_codec.encode_data(data))
                 .transpose()?,
-            key: Some(event.into()),
-            r#type: WsIoPacketType::Event,
-        })
+        ))
         .await
     }
 
     #[cfg(feature = "connection-extensions")]
     #[inline]
-    pub fn extensions(&self) -> &WsIoServerConnectionExtensions {
+    pub fn extensions(&self) -> &ConnectionExtensions {
         &self.extensions
     }
 
