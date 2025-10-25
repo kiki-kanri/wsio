@@ -96,6 +96,14 @@ impl WsIoServerRuntime {
         self.connections.remove(sid);
     }
 
+    pub(crate) async fn remove_namespace(&self, path: &str) {
+        let Some((_, namespace)) = self.namespaces.remove(path) else {
+            return;
+        };
+
+        namespace.shutdown().await;
+    }
+
     pub(crate) async fn shutdown(&self) {
         match self.status.get() {
             RuntimeStatus::Stopped => return,

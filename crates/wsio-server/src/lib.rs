@@ -54,6 +54,10 @@ impl WsIoServer {
         self.0.new_namespace_builder(path.as_ref())
     }
 
+    pub async fn remove_namespace(&self, path: impl AsRef<str>) {
+        self.0.remove_namespace(path.as_ref()).await
+    }
+
     pub async fn shutdown(&self) {
         self.0.shutdown().await
     }
