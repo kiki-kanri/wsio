@@ -80,9 +80,9 @@ impl WsIoClientBuilder {
         Fut: Future<Output = Result<D>> + Send + 'static,
     {
         let handler = Arc::new(handler);
-        self.config.auth_handler = Some(Box::new(move |connection| {
+        self.config.auth_handler = Some(Box::new(move |connection, packet_codec| {
             let handler = handler.clone();
-            Box::pin(async move { self.config.packet_codec.encode_data(&handler(connection).await?) })
+            Box::pin(async move { packet_codec.encode_data(&handler(connection).await?) })
         }));
 
         self

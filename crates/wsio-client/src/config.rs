@@ -1,5 +1,10 @@
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
 
+use anyhow::Result;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use url::Url;
 
@@ -14,8 +19,18 @@ use crate::{
     },
 };
 
+type AuthHandler = Box<
+    dyn for<'a> Fn(
+            Arc<WsIoClientConnection>,
+            &'a WsIoPacketCodec,
+        ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>>> + Send + 'a>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
 pub(crate) struct WsIoClientConfig {
-    pub(crate) auth_handler: Option<BoxAsyncUnaryResultHandler<WsIoClientConnection, Vec<u8>>>,
+    pub(crate) auth_handler: Option<AuthHandler>,
 
     /// Maximum duration allowed for the auth handler to execute.
     pub(crate) auth_handler_timeout: Duration,

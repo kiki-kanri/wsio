@@ -121,7 +121,11 @@ impl WsIoClientConnection {
             // Ensure auth handler is configured
             if let Some(auth_handler) = &self.runtime.config.auth_handler {
                 // Execute auth handler with timeout protection
-                let auth_data = timeout(self.runtime.config.auth_handler_timeout, auth_handler(self.clone())).await??;
+                let auth_data = timeout(
+                    self.runtime.config.auth_handler_timeout,
+                    auth_handler(self.clone(), &self.runtime.config.packet_codec),
+                )
+                .await??;
 
                 // Send Auth packet only if still in AwaitingReady state
                 if self.status.is(ConnectionStatus::AwaitingReady) {

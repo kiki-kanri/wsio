@@ -171,7 +171,7 @@ impl WsIoServerConnection {
         if let Some(auth_handler) = &self.namespace.config.auth_handler {
             timeout(
                 self.namespace.config.auth_handler_timeout,
-                auth_handler(self.clone(), packet_data),
+                auth_handler(self.clone(), packet_data, &self.namespace.config.packet_codec),
             )
             .await??;
 
