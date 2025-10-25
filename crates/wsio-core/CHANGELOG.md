@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.2...wsio-core-v0.4.0) - 2025-10-25 07:21
+
+### 💅 Refactors
+
+- [**breaking**] update auth handler to require sending `data` ([4a273c2](https://github.com/ws-io/ws.io-rs/commit/4a273c2))
+- merge/extract parts of code and replace some `Arc` with `Box` ([65a6b50](https://github.com/ws-io/ws.io-rs/commit/65a6b50))
+
 ## [0.3.2](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.1...wsio-core-v0.3.2) - 2025-10-23 07:04
 
 ### 🏡 Chore

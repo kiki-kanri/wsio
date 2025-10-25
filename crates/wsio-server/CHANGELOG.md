@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.4.0...wsio-server-v0.5.0) - 2025-10-25 07:21
+
+### 🏡 Chore
+
+- remove unused or unnecessary TODO comments ([ddb0c19](https://github.com/ws-io/ws.io-rs/commit/ddb0c19))
+
+### 💅 Refactors
+
+- *(server)* change `emit` event parameter type to `impl Into<String>` ([b190c9e](https://github.com/ws-io/ws.io-rs/commit/b190c9e))
+- [**breaking**] update auth handler to require sending `data` ([4a273c2](https://github.com/ws-io/ws.io-rs/commit/4a273c2))
+- *(server)* store `Weak` instead of `Arc` for connections in runtime ([f678413](https://github.com/ws-io/ws.io-rs/commit/f678413))
+- merge/extract parts of code and replace some `Arc` with `Box` ([65a6b50](https://github.com/ws-io/ws.io-rs/commit/65a6b50))
+- *(server)* split `WsIoServerNamespace.handle_on_upgrade_request` to reduce complexity and fix incorrect variable naming ([9dbea5e](https://github.com/ws-io/ws.io-rs/commit/9dbea5e))
+
+### 🔥 Performance
+
+- *(server)* optimize `dispatch_request` ([f327974](https://github.com/ws-io/ws.io-rs/commit/f327974))
+
+### 🚀 Enhancements
+
+- *(server)* in `handle_upgraded_request`, check status and send disconnect packet if not running before ending process ([e57702e](https://github.com/ws-io/ws.io-rs/commit/e57702e))
+- *(server)* add `remove_namespace` method ([d77896a](https://github.com/ws-io/ws.io-rs/commit/d77896a))
+- *(server)* add `shutdown` method to server and namespace ([172808e](https://github.com/ws-io/ws.io-rs/commit/172808e))
+
+### 🩹 Fixes
+
+- resolve issue where calling `.auth` methods on builder captured current codec, causing inconsistent results when codec and auth builder method call order differed ([d4f7bd2](https://github.com/ws-io/ws.io-rs/commit/d4f7bd2))
+- *(server)* correct incorrect parameter type ([9c7f2d7](https://github.com/ws-io/ws.io-rs/commit/9c7f2d7))
+
 ## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.3.1...wsio-server-v0.4.0) - 2025-10-23 07:04
 
 ### 🏡 Chore

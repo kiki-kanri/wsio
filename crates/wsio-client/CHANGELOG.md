@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.3.0...wsio-client-v0.4.0) - 2025-10-25 07:21
+
+### 🏡 Chore
+
+- remove unused or unnecessary TODO comments ([ddb0c19](https://github.com/ws-io/ws.io-rs/commit/ddb0c19))
+
+### 💅 Refactors
+
+- *(client)* lint code ([a846571](https://github.com/ws-io/ws.io-rs/commit/a846571))
+- *(client)* change functions that unnecessarily returned `Result` to return directly ([0f7e3fc](https://github.com/ws-io/ws.io-rs/commit/0f7e3fc))
+- *(client)* remove unreachable condition check in `.disconnect` method ([16a691a](https://github.com/ws-io/ws.io-rs/commit/16a691a))
+- [**breaking**] update auth handler to require sending `data` ([4a273c2](https://github.com/ws-io/ws.io-rs/commit/4a273c2))
+- merge/extract parts of code and replace some `Arc` with `Box` ([65a6b50](https://github.com/ws-io/ws.io-rs/commit/65a6b50))
+
+### 🚀 Enhancements
+
+- *(client)* implement `emit` with buffering and automatic retry functionality ([da0ede9](https://github.com/ws-io/ws.io-rs/commit/da0ede9))
+
+### 🩹 Fixes
+
+- resolve issue where calling `.auth` methods on builder captured current codec, causing inconsistent results when codec and auth builder method call order differed ([d4f7bd2](https://github.com/ws-io/ws.io-rs/commit/d4f7bd2))
+
 ## [0.3.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.2.2...wsio-client-v0.3.0) - 2025-10-23 07:04
 
 ### 🏡 Chore
