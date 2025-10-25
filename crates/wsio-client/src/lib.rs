@@ -35,11 +35,11 @@ impl WsIoClient {
         WsIoClientBuilder::new(url)
     }
 
-    pub async fn connect(&self) -> Result<()> {
+    pub async fn connect(&self) {
         self.0.connect().await
     }
 
-    pub async fn disconnect(&self) -> Result<()> {
+    pub async fn disconnect(&self) {
         self.0.disconnect().await
     }
 }

@@ -64,12 +64,12 @@ impl WsIoClientRuntime {
     }
 
     // Protected methods
-    pub(crate) async fn connect(self: &Arc<Self>) -> Result<()> {
+    pub(crate) async fn connect(self: &Arc<Self>) {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
         match self.status.get() {
-            RuntimeStatus::Running => return Ok(()),
+            RuntimeStatus::Running => return,
             RuntimeStatus::Stopped => self.status.store(RuntimeStatus::Running),
             _ => unreachable!(),
         }
@@ -79,16 +79,14 @@ impl WsIoClientRuntime {
         let runtime = self.clone();
         *self.connection_loop_task.lock().await =
             Some(spawn(async move { runtime.run_connection_loop(break_notify).await }));
-
-        Ok(())
     }
 
-    pub(crate) async fn disconnect(self: &Arc<Self>) -> Result<()> {
+    pub(crate) async fn disconnect(self: &Arc<Self>) {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
         match self.status.get() {
-            RuntimeStatus::Stopped => return Ok(()),
+            RuntimeStatus::Stopped => return,
             RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
             _ => unreachable!(),
         }
@@ -106,7 +104,6 @@ impl WsIoClientRuntime {
         }
 
         self.status.store(RuntimeStatus::Stopped);
-        Ok(())
     }
 
     #[inline]
