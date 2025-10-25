@@ -26,7 +26,7 @@ use crate::{
 
 #[repr(u8)]
 #[derive(Debug, IntoPrimitive, TryFromPrimitive)]
-enum RuntimeStatus {
+pub(crate) enum WsIoServerRuntimeStatus {
     Running,
     Stopped,
     Stopping,
@@ -36,7 +36,7 @@ pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
     connections: DashMap<String, Weak<WsIoServerConnection>>,
     namespaces: DashMap<String, Arc<WsIoServerNamespace>>,
-    status: AtomicStatus<RuntimeStatus>,
+    pub(crate) status: AtomicStatus<WsIoServerRuntimeStatus>,
 }
 
 impl WsIoServerRuntime {
@@ -45,7 +45,7 @@ impl WsIoServerRuntime {
             config,
             connections: DashMap::new(),
             namespaces: DashMap::new(),
-            status: AtomicStatus::new(RuntimeStatus::Running),
+            status: AtomicStatus::new(WsIoServerRuntimeStatus::Running),
         })
     }
 
@@ -106,8 +106,8 @@ impl WsIoServerRuntime {
 
     pub(crate) async fn shutdown(&self) {
         match self.status.get() {
-            RuntimeStatus::Stopped => return,
-            RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
+            WsIoServerRuntimeStatus::Stopped => return,
+            WsIoServerRuntimeStatus::Running => self.status.store(WsIoServerRuntimeStatus::Stopping),
             _ => unreachable!(),
         }
 
@@ -117,6 +117,6 @@ impl WsIoServerRuntime {
         }))
         .await;
 
-        self.status.store(RuntimeStatus::Stopped);
+        self.status.store(WsIoServerRuntimeStatus::Stopped);
     }
 }

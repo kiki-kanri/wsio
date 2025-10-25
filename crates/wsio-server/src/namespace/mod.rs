@@ -41,14 +41,20 @@ use crate::{
     connection::WsIoServerConnection,
     core::{
         atomic::status::AtomicStatus,
-        packet::WsIoPacket,
+        packet::{
+            WsIoPacket,
+            WsIoPacketType,
+        },
     },
-    runtime::WsIoServerRuntime,
+    runtime::{
+        WsIoServerRuntime,
+        WsIoServerRuntimeStatus,
+    },
 };
 
 #[repr(u8)]
 #[derive(Debug, IntoPrimitive, TryFromPrimitive)]
-enum RuntimeStatus {
+enum NamespaceStatus {
     Running,
     Stopped,
     Stopping,
@@ -59,7 +65,7 @@ pub struct WsIoServerNamespace {
     connections: DashMap<String, Arc<WsIoServerConnection>>,
     connection_tasks: DashMap<String, JoinHandle<()>>,
     runtime: Arc<WsIoServerRuntime>,
-    status: AtomicStatus<RuntimeStatus>,
+    status: AtomicStatus<NamespaceStatus>,
 }
 
 impl WsIoServerNamespace {
@@ -69,16 +75,35 @@ impl WsIoServerNamespace {
             connections: DashMap::new(),
             connection_tasks: DashMap::new(),
             runtime,
-            status: AtomicStatus::new(RuntimeStatus::Running),
+            status: AtomicStatus::new(NamespaceStatus::Running),
         })
     }
 
     // Private methods
-    async fn handle_upgraded_request(self: &Arc<Self>, connection_sid: &str, headers: HeaderMap, upgraded: Upgraded) {
+    async fn handle_upgraded_request(
+        self: &Arc<Self>,
+        connection_sid: &str,
+        headers: HeaderMap,
+        upgraded: Upgraded,
+    ) -> Result<()> {
         // Create ws stream
-        let ws_stream =
+        let mut ws_stream =
             WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(self.config.websocket_config))
                 .await;
+
+        // Check runtime and namespace status
+        if !self.runtime.status.is(WsIoServerRuntimeStatus::Running) || !self.status.is(NamespaceStatus::Running) {
+            ws_stream
+                .send(self.encode_packet_to_message(&WsIoPacket {
+                    data: None,
+                    key: None,
+                    r#type: WsIoPacketType::Disconnect,
+                })?)
+                .await?;
+
+            let _ = ws_stream.close(None).await;
+            return Ok(());
+        }
 
         // Create connection
         let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone(), connection_sid.to_string());
@@ -139,6 +164,7 @@ impl WsIoServerNamespace {
 
         // Cleanup connection
         connection.cleanup().await;
+        Ok(())
     }
 
     // Protected methods
@@ -160,8 +186,7 @@ impl WsIoServerNamespace {
             connection_sid.clone(),
             spawn(async move {
                 if let Ok(upgraded) = on_upgrade.await {
-                    namespace
-                        .clone()
+                    let _ = namespace
                         .handle_upgraded_request(&connection_sid, headers, upgraded)
                         .await;
                 }
@@ -203,8 +228,8 @@ impl WsIoServerNamespace {
     // Public methods
     pub async fn shutdown(&self) {
         match self.status.get() {
-            RuntimeStatus::Stopped => return,
-            RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
+            NamespaceStatus::Stopped => return,
+            NamespaceStatus::Running => self.status.store(NamespaceStatus::Stopping),
             _ => unreachable!(),
         }
 
@@ -227,6 +252,6 @@ impl WsIoServerNamespace {
         )
         .await;
 
-        self.status.store(RuntimeStatus::Stopped);
+        self.status.store(NamespaceStatus::Stopped);
     }
 }
