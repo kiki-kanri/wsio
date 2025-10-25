@@ -88,8 +88,9 @@ impl WsIoClientRuntime {
         let _lock = self.operate_lock.lock().await;
 
         match self.status.get() {
-            RuntimeStatus::Stopped | RuntimeStatus::Stopping => return Ok(()),
+            RuntimeStatus::Stopped => return Ok(()),
             RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
+            _ => unreachable!(),
         }
 
         if let Some(break_run_connection_loop_notify) = self.break_run_connection_loop_notify.load_full() {
