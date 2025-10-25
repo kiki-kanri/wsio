@@ -53,4 +53,8 @@ impl WsIoServer {
     pub fn new_namespace_builder(&self, path: impl AsRef<str>) -> Result<WsIoServerNamespaceBuilder> {
         self.0.new_namespace_builder(path.as_ref())
     }
+
+    pub async fn shutdown(&self) {
+        self.0.shutdown().await
+    }
 }

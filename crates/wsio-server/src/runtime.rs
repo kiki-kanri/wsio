@@ -8,20 +8,35 @@ use anyhow::{
     bail,
 };
 use dashmap::DashMap;
+use futures_util::future::join_all;
+use num_enum::{
+    IntoPrimitive,
+    TryFromPrimitive,
+};
 
 use crate::{
     config::WsIoServerConfig,
     connection::WsIoServerConnection,
+    core::atomic::status::AtomicStatus,
     namespace::{
         WsIoServerNamespace,
         builder::WsIoServerNamespaceBuilder,
     },
 };
 
+#[repr(u8)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+enum RuntimeStatus {
+    Running,
+    Stopped,
+    Stopping,
+}
+
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
     connections: DashMap<String, Weak<WsIoServerConnection>>,
     namespaces: DashMap<String, Arc<WsIoServerNamespace>>,
+    status: AtomicStatus<RuntimeStatus>,
 }
 
 impl WsIoServerRuntime {
@@ -30,6 +45,7 @@ impl WsIoServerRuntime {
             config,
             connections: DashMap::new(),
             namespaces: DashMap::new(),
+            status: AtomicStatus::new(RuntimeStatus::Running),
         })
     }
 
@@ -78,5 +94,21 @@ impl WsIoServerRuntime {
     #[inline]
     pub(crate) fn remove_connection(&self, sid: &str) {
         self.connections.remove(sid);
+    }
+
+    pub(crate) async fn shutdown(&self) {
+        match self.status.get() {
+            RuntimeStatus::Stopped => return,
+            RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
+            _ => unreachable!(),
+        }
+
+        join_all(self.namespaces.iter().map(|entry| {
+            let namespace = entry.value().clone();
+            async move { namespace.shutdown().await }
+        }))
+        .await;
+
+        self.status.store(RuntimeStatus::Stopped);
     }
 }

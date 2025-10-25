@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use futures_util::{
     SinkExt,
     StreamExt,
+    future::join_all,
 };
 use http::HeaderMap;
 use hyper::upgrade::{
@@ -13,6 +14,10 @@ use hyper::upgrade::{
     Upgraded,
 };
 use hyper_util::rt::TokioIo;
+use num_enum::{
+    IntoPrimitive,
+    TryFromPrimitive,
+};
 use tokio::{
     join,
     select,
@@ -34,15 +39,27 @@ use self::config::WsIoServerNamespaceConfig;
 use crate::{
     WsIoServer,
     connection::WsIoServerConnection,
-    core::packet::WsIoPacket,
+    core::{
+        atomic::status::AtomicStatus,
+        packet::WsIoPacket,
+    },
     runtime::WsIoServerRuntime,
 };
+
+#[repr(u8)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+enum RuntimeStatus {
+    Running,
+    Stopped,
+    Stopping,
+}
 
 pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
     connections: DashMap<String, Arc<WsIoServerConnection>>,
     connection_tasks: DashMap<String, JoinHandle<()>>,
     runtime: Arc<WsIoServerRuntime>,
+    status: AtomicStatus<RuntimeStatus>,
 }
 
 impl WsIoServerNamespace {
@@ -52,6 +69,7 @@ impl WsIoServerNamespace {
             connections: DashMap::new(),
             connection_tasks: DashMap::new(),
             runtime,
+            status: AtomicStatus::new(RuntimeStatus::Running),
         })
     }
 
@@ -180,5 +198,35 @@ impl WsIoServerNamespace {
     #[inline]
     pub fn server(&self) -> WsIoServer {
         WsIoServer(self.runtime.clone())
+    }
+
+    // Public methods
+    pub async fn shutdown(&self) {
+        match self.status.get() {
+            RuntimeStatus::Stopped => return,
+            RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
+            _ => unreachable!(),
+        }
+
+        join_all(self.connections.iter().map(|entry| {
+            let connection = entry.value().clone();
+            async move { connection.disconnect().await }
+        }))
+        .await;
+
+        let connection_sids = self
+            .connection_tasks
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect::<Vec<_>>();
+
+        join_all(
+            connection_sids
+                .iter()
+                .filter_map(|sid| self.connection_tasks.remove(sid).map(|(_, task)| task)),
+        )
+        .await;
+
+        self.status.store(RuntimeStatus::Stopped);
     }
 }
