@@ -304,7 +304,7 @@ impl WsIoServerConnection {
         self.close()
     }
 
-    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
+    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
         let status = self.status.get();
         if status != ConnectionStatus::Ready {
             bail!("Cannot emit event in invalid status: {:#?}", status);
@@ -314,7 +314,7 @@ impl WsIoServerConnection {
             data: data
                 .map(|data| self.namespace.config.packet_codec.encode_data(data))
                 .transpose()?,
-            key: Some(event.as_ref().to_string()),
+            key: Some(event.into()),
             r#type: WsIoPacketType::Event,
         })
         .await
