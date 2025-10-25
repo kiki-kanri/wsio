@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
                 .packet_codec(WsIoPacketCodec::Bincode)
                 .build();
 
-            let _ = client.connect().await;
+            client.connect().await;
             drop(permit);
 
             if i % 1000 == 0 {
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
             }
 
             sleep(Duration::from_secs(10)).await;
-            let _ = client.disconnect().await;
+            client.disconnect().await;
 
             if i % 1000 == 0 {
                 println!("disconnected {i}");

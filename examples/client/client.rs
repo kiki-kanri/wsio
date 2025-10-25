@@ -95,7 +95,7 @@ async fn on_connection_ready(_: Arc<WsIoClientConnection>, namespace: &str) -> R
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _ = join!(
+    join!(
         AUTH.connect(),
         BINCODE.connect(),
         CBOR.connect(),
@@ -106,7 +106,7 @@ async fn main() -> Result<()> {
     );
 
     let _ = wait_for_shutdown_signal().await;
-    let _ = join!(
+    join!(
         AUTH.disconnect(),
         BINCODE.disconnect(),
         CBOR.disconnect(),
