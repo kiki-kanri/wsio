@@ -17,7 +17,7 @@ static AUTH: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/auth";
     WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .auth::<&(), _, _>(|_| async { Ok(None) })
+        .auth(|_| async { Ok(()) })
         .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
         .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
         .build()

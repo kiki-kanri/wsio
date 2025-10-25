@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
         .new_namespace_builder("/auth")?
         .on_connect(on_connect)
         .on_ready(on_ready)
-        .with_auth(|_, _: Option<&()>| async { Ok(()) })
+        .with_auth(|_, _: &()| async { Ok(()) })
         .register()?;
 
     // Register /bincode namespace
