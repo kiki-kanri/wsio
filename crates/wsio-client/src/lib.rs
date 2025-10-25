@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use serde::Serialize;
 use url::Url;
 pub use wsio_core as core;
 
@@ -37,6 +38,10 @@ impl WsIoClient {
 
     pub async fn connect(&self) {
         self.0.connect().await
+    }
+
+    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+        self.0.emit(event.into(), data).await
     }
 
     pub async fn disconnect(&self) {

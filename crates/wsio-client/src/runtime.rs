@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{
+    Result,
+    bail,
+};
 use arc_swap::ArcSwapOption;
 use futures_util::{
     SinkExt,
@@ -10,12 +13,18 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
+use serde::Serialize;
 use tokio::{
     select,
     spawn,
     sync::{
         Mutex,
         Notify,
+        mpsc::{
+            Receiver,
+            Sender,
+            channel,
+        },
     },
     task::JoinHandle,
     time::sleep,
@@ -30,12 +39,15 @@ use crate::{
     connection::WsIoClientConnection,
     core::{
         atomic::status::AtomicStatus,
-        packet::WsIoPacket,
+        packet::{
+            WsIoPacket,
+            WsIoPacketType,
+        },
     },
 };
 
 #[repr(u8)]
-#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum RuntimeStatus {
     Running,
     Stopped,
@@ -43,23 +55,32 @@ enum RuntimeStatus {
 }
 
 pub(crate) struct WsIoClientRuntime {
-    break_run_connection_loop_notify: ArcSwapOption<Notify>,
     pub(crate) config: WsIoClientConfig,
     connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
+    pub(crate) event_message_flush_notify: Notify,
+    event_message_flush_task: Mutex<Option<JoinHandle<()>>>,
+    event_message_send_rx: Mutex<Receiver<Message>>,
+    event_message_send_tx: Sender<Message>,
     operate_lock: Mutex<()>,
     status: AtomicStatus<RuntimeStatus>,
+    wake_reconnect_wait_notify: Notify,
 }
 
 impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
+        let (event_message_send_tx, event_message_send_rx) = channel(512);
         Arc::new(Self {
-            break_run_connection_loop_notify: ArcSwapOption::new(None),
             config,
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
+            event_message_flush_notify: Notify::new(),
+            event_message_flush_task: Mutex::new(None),
+            event_message_send_rx: Mutex::new(event_message_send_rx),
+            event_message_send_tx,
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
+            wake_reconnect_wait_notify: Notify::new(),
         })
     }
 
@@ -74,11 +95,26 @@ impl WsIoClientRuntime {
             _ => unreachable!(),
         }
 
-        let break_notify = Arc::new(Notify::new());
-        self.break_run_connection_loop_notify.store(Some(break_notify.clone()));
+        // Create connection loop task
         let runtime = self.clone();
-        *self.connection_loop_task.lock().await =
-            Some(spawn(async move { runtime.run_connection_loop(break_notify).await }));
+        *self.connection_loop_task.lock().await = Some(spawn(async move { runtime.run_connection_loop().await }));
+
+        // Create flush messages task
+        let runtime = self.clone();
+        *self.event_message_flush_task.lock().await = Some(spawn(async move {
+            let mut event_message_send_rx = runtime.event_message_send_rx.lock().await;
+            while let Some(message) = event_message_send_rx.recv().await {
+                loop {
+                    if let Some(connection) = runtime.connection.load().as_ref() {
+                        if connection.send_event_message(message.clone()).await.is_ok() {
+                            break;
+                        }
+                    }
+
+                    runtime.event_message_flush_notify.notified().await;
+                }
+            }
+        }));
     }
 
     pub(crate) async fn disconnect(self: &Arc<Self>) {
@@ -91,19 +127,50 @@ impl WsIoClientRuntime {
             _ => unreachable!(),
         }
 
-        if let Some(break_run_connection_loop_notify) = self.break_run_connection_loop_notify.load_full() {
-            break_run_connection_loop_notify.notify_one();
+        // Abort event-message-flush task if still active
+        if let Some(event_message_flush_task) = self.event_message_flush_task.lock().await.take() {
+            event_message_flush_task.abort();
         }
 
-        if let Some(connection) = self.connection.load_full() {
+        // Drop all pending event messages in the channel
+        let mut event_message_send_rx = self.event_message_send_rx.lock().await;
+        while event_message_send_rx.try_recv().is_ok() {}
+
+        // Wake reconnect loop to break out of sleep early
+        self.wake_reconnect_wait_notify.notify_waiters();
+
+        // Close connection
+        if let Some(connection) = self.connection.load().as_ref() {
             connection.close();
         }
 
+        // Await connection loop task termination
         if let Some(connection_loop_task) = self.connection_loop_task.lock().await.take() {
             let _ = connection_loop_task.await;
         }
 
         self.status.store(RuntimeStatus::Stopped);
+    }
+
+    pub async fn emit<D: Serialize>(&self, event: String, data: Option<&D>) -> Result<()> {
+        let status = self.status.get();
+        if status != RuntimeStatus::Running {
+            bail!("Cannot emit event in invalid status: {:#?}", status);
+        }
+
+        self.event_message_send_tx
+            .send(
+                self.encode_packet_to_message(&WsIoPacket {
+                    data: data
+                        .map(|data| self.config.packet_codec.encode_data(data))
+                        .transpose()?,
+                    key: Some(event.to_string()),
+                    r#type: WsIoPacketType::Event,
+                })?,
+            )
+            .await?;
+
+        Ok(())
     }
 
     #[inline]
@@ -173,7 +240,7 @@ impl WsIoClientRuntime {
         Ok(())
     }
 
-    pub(crate) async fn run_connection_loop(self: &Arc<Self>, break_notify: Arc<Notify>) {
+    pub(crate) async fn run_connection_loop(self: &Arc<Self>) {
         loop {
             if !self.status.is(RuntimeStatus::Running) {
                 break;
@@ -182,7 +249,7 @@ impl WsIoClientRuntime {
             let _ = self.run_connection().await;
             if self.status.is(RuntimeStatus::Running) {
                 select! {
-                    _ = break_notify.notified() => {
+                    _ = self.wake_reconnect_wait_notify.notified() => {
                         break;
                     },
                     _ = sleep(self.config.reconnection_delay) => {},

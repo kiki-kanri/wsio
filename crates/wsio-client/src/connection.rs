@@ -41,7 +41,7 @@ use crate::{
 };
 
 #[repr(u8)]
-#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum ConnectionStatus {
     AwaitingInit,
     AwaitingReady,
@@ -155,6 +155,9 @@ impl WsIoClientConnection {
         // Abort ready-timeout task if still active
         abort_locked_task(&self.ready_timeout_task).await;
 
+        // Wake event message flush task
+        self.runtime.event_message_flush_notify.notify_waiters();
+
         // Invoke on_connection_ready handler if configured
         if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
             // Run handler asynchronously in a detached task
@@ -234,6 +237,15 @@ impl WsIoClientConnection {
                 connection.close();
             }
         }));
+    }
+
+    pub(crate) async fn send_event_message(&self, message: Message) -> Result<()> {
+        let status = self.status.get();
+        if status != ConnectionStatus::Ready {
+            bail!("Cannot send event message in invalid status: {:#?}", status);
+        }
+
+        Ok(self.message_tx.send(message).await?)
     }
 
     // Public methods

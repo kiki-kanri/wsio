@@ -12,15 +12,12 @@ Since development is not yet complete, documentation is currently unavailable. H
 
 ## TODO
 
-- server.close
 - server emit
 - namespace emit
 - server on/off handlers and multiple handlers of same event
-- client emit and buffer
 - client on/off handlers and multiple handlers of same event
 - rooms
 - to rooms and emit
-- broadcast
 - check errors and efficacy
 - docs
 - extract and merge duplicate code
