@@ -105,10 +105,10 @@ impl WsIoClientRuntime {
             let mut event_message_send_rx = runtime.event_message_send_rx.lock().await;
             while let Some(message) = event_message_send_rx.recv().await {
                 loop {
-                    if let Some(connection) = runtime.connection.load().as_ref() {
-                        if connection.send_event_message(message.clone()).await.is_ok() {
-                            break;
-                        }
+                    if let Some(connection) = runtime.connection.load().as_ref()
+                        && connection.send_event_message(message.clone()).await.is_ok()
+                    {
+                        break;
                     }
 
                     runtime.event_message_flush_notify.notified().await;
