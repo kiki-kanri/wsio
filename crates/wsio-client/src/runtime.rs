@@ -13,7 +13,10 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
-use serde::Serialize;
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 use tokio::{
     select,
     spawn,
@@ -40,6 +43,7 @@ use crate::{
     core::{
         atomic::status::AtomicStatus,
         channel_capacity_from_websocket_config,
+        event::registry::WsIoEventRegistry,
         packet::WsIoPacket,
     },
 };
@@ -60,6 +64,7 @@ pub(crate) struct WsIoClientRuntime {
     event_message_flush_task: Mutex<Option<JoinHandle<()>>>,
     event_message_send_rx: Mutex<Receiver<Message>>,
     event_message_send_tx: Sender<Message>,
+    event_registry: WsIoEventRegistry<WsIoClientConnection>,
     operate_lock: Mutex<()>,
     status: AtomicStatus<RuntimeStatus>,
     wake_reconnect_wait_notify: Notify,
@@ -77,6 +82,7 @@ impl WsIoClientRuntime {
             event_message_flush_task: Mutex::new(None),
             event_message_send_rx: Mutex::new(event_message_send_rx),
             event_message_send_tx,
+            event_registry: WsIoEventRegistry::new(),
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
             wake_reconnect_wait_notify: Notify::new(),
@@ -195,6 +201,26 @@ impl WsIoClientRuntime {
             true => Message::Text(unsafe { String::from_utf8_unchecked(bytes).into() }),
             false => Message::Binary(bytes.into()),
         })
+    }
+
+    #[inline]
+    pub(crate) fn off(&self, event: impl Into<String>) {
+        self.event_registry.off(event);
+    }
+
+    #[inline]
+    pub(crate) fn off_by_handler_id(&self, event: impl Into<String>, handler_id: u32) {
+        self.event_registry.off_by_handler_id(event, handler_id);
+    }
+
+    #[inline]
+    pub(crate) fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
+    where
+        H: Fn(Arc<WsIoClientConnection>, &D) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+        D: DeserializeOwned + Send + Sync + 'static,
+    {
+        self.event_registry.on(event, handler)
     }
 
     pub(crate) async fn run_connection(self: &Arc<Self>) -> Result<()> {

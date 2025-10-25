@@ -9,7 +9,10 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
-use serde::Serialize;
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 use tokio::{
     select,
     spawn,
@@ -40,6 +43,7 @@ use crate::{
     core::{
         atomic::status::AtomicStatus,
         channel_capacity_from_websocket_config,
+        event::registry::WsIoEventRegistry,
         packet::{
             WsIoPacket,
             WsIoPacketType,
@@ -65,6 +69,7 @@ enum ConnectionStatus {
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: CancellationToken,
+    event_registry: WsIoEventRegistry<WsIoServerConnection>,
     #[cfg(feature = "connection-extensions")]
     extensions: ConnectionExtensions,
     headers: HeaderMap,
@@ -88,6 +93,7 @@ impl WsIoServerConnection {
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
                 cancel_token: CancellationToken::new(),
+                event_registry: WsIoEventRegistry::new(),
                 #[cfg(feature = "connection-extensions")]
                 extensions: ConnectionExtensions::new(),
                 headers,
@@ -315,6 +321,26 @@ impl WsIoServerConnection {
     #[inline]
     pub fn namespace(&self) -> Arc<WsIoServerNamespace> {
         self.namespace.clone()
+    }
+
+    #[inline]
+    pub fn off(&self, event: impl Into<String>) {
+        self.event_registry.off(event);
+    }
+
+    #[inline]
+    pub fn off_by_handler_id(&self, event: impl Into<String>, handler_id: u32) {
+        self.event_registry.off_by_handler_id(event, handler_id);
+    }
+
+    #[inline]
+    pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
+    where
+        H: Fn(Arc<WsIoServerConnection>, &D) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+        D: DeserializeOwned + Send + Sync + 'static,
+    {
+        self.event_registry.on(event, handler)
     }
 
     pub async fn on_close<H, Fut>(&self, handler: H)
