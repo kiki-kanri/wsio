@@ -138,6 +138,7 @@ impl WsIoPacketCodec {
         }
     }
 
+    #[inline]
     pub fn is_text(&self) -> bool {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
