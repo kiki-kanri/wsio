@@ -12,10 +12,7 @@ use tokio::{
     spawn,
     sync::{
         Mutex,
-        mpsc::{
-            Receiver,
-            channel,
-        },
+        mpsc::Receiver,
     },
     task::JoinHandle,
     time::{
@@ -28,7 +25,6 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     core::{
-        channel_capacity_from_websocket_config,
         connection::core::WsIoConnectionCore,
         packet::{
             WsIoPacket,
@@ -62,11 +58,10 @@ pub struct WsIoClientConnection {
 impl WsIoClientConnection {
     #[inline]
     pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
-        let channel_capacity = channel_capacity_from_websocket_config(runtime.config.websocket_config);
-        let (message_tx, message_rx) = channel(channel_capacity);
+        let (core, message_rx) = WsIoConnectionCore::new(ConnectionStatus::Created, &runtime.config.websocket_config);
         (
             Arc::new(Self {
-                core: WsIoConnectionCore::new(message_tx, ConnectionStatus::Created),
+                core,
                 init_timeout_task: Mutex::new(None),
                 ready_timeout_task: Mutex::new(None),
                 runtime,

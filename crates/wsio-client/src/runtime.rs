@@ -72,7 +72,7 @@ pub(crate) struct WsIoClientRuntime {
 
 impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
-        let channel_capacity = channel_capacity_from_websocket_config(config.websocket_config);
+        let channel_capacity = channel_capacity_from_websocket_config(&config.websocket_config);
         let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
         Arc::new(Self {
             config,

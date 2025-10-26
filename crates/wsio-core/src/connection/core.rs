@@ -2,12 +2,22 @@ use anyhow::Result;
 use tokio::{
     select,
     spawn,
-    sync::mpsc::Sender,
+    sync::mpsc::{
+        Receiver,
+        Sender,
+        channel,
+    },
 };
 use tokio_util::sync::CancellationToken;
-use tungstenite::Message;
+use tungstenite::{
+    Message,
+    protocol::WebSocketConfig,
+};
 
-use crate::atomic::status::AtomicStatus;
+use crate::{
+    atomic::status::AtomicStatus,
+    channel_capacity_from_websocket_config,
+};
 
 pub struct WsIoConnectionCore<S: Into<u8> + TryFrom<u8>> {
     pub cancel_token: CancellationToken,
@@ -17,12 +27,17 @@ pub struct WsIoConnectionCore<S: Into<u8> + TryFrom<u8>> {
 
 impl<S: Into<u8> + TryFrom<u8>> WsIoConnectionCore<S> {
     #[inline]
-    pub fn new(message_tx: Sender<Message>, status: S) -> Self {
-        Self {
-            cancel_token: CancellationToken::new(),
-            message_tx,
-            status: AtomicStatus::new(status),
-        }
+    pub fn new(status: S, websocket_config: &WebSocketConfig) -> (Self, Receiver<Message>) {
+        let channel_capacity = channel_capacity_from_websocket_config(websocket_config);
+        let (message_tx, message_rx) = channel(channel_capacity);
+        (
+            Self {
+                cancel_token: CancellationToken::new(),
+                message_tx,
+                status: AtomicStatus::new(status),
+            },
+            message_rx,
+        )
     }
 
     // Public methods

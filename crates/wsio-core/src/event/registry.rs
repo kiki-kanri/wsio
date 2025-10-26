@@ -31,10 +31,10 @@ type Handler<T> = Box<
 >;
 
 pub struct WsIoEventRegistry<T> {
-    pub data_decoders: RwLock<HashMap<String, DataDecoder>>,
-    pub data_type_ids: RwLock<HashMap<String, TypeId>>,
-    pub handlers: RwLock<HashMap<String, HashMap<u32, Handler<T>>>>,
-    pub next_handler_id: AtomicU32,
+    data_decoders: RwLock<HashMap<String, DataDecoder>>,
+    data_type_ids: RwLock<HashMap<String, TypeId>>,
+    handlers: RwLock<HashMap<String, HashMap<u32, Handler<T>>>>,
+    next_handler_id: AtomicU32,
 }
 
 impl<T> Default for WsIoEventRegistry<T> {
@@ -55,6 +55,7 @@ impl<T> WsIoEventRegistry<T> {
     }
 
     // Public methods
+
     #[inline]
     pub fn off(&self, event: impl Into<String>) {
         let event = event.into();

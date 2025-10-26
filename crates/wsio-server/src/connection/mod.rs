@@ -17,10 +17,7 @@ use tokio::{
     spawn,
     sync::{
         Mutex,
-        mpsc::{
-            Receiver,
-            channel,
-        },
+        mpsc::Receiver,
     },
     task::JoinHandle,
     time::{
@@ -39,7 +36,6 @@ use self::extensions::ConnectionExtensions;
 use crate::{
     WsIoServer,
     core::{
-        channel_capacity_from_websocket_config,
         connection::core::WsIoConnectionCore,
         event::registry::WsIoEventRegistry,
         packet::{
@@ -83,12 +79,11 @@ impl WsIoServerConnection {
         namespace: Arc<WsIoServerNamespace>,
         sid: String,
     ) -> (Arc<Self>, Receiver<Message>) {
-        let channel_capacity = channel_capacity_from_websocket_config(namespace.config.websocket_config);
-        let (message_tx, message_rx) = channel(channel_capacity);
+        let (core, message_rx) = WsIoConnectionCore::new(ConnectionStatus::Created, &namespace.config.websocket_config);
         (
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
-                core: WsIoConnectionCore::new(message_tx, ConnectionStatus::Created),
+                core,
                 event_registry: WsIoEventRegistry::new(),
                 #[cfg(feature = "connection-extensions")]
                 extensions: ConnectionExtensions::new(),
