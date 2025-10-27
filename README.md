@@ -23,6 +23,7 @@ Since development is not yet complete, documentation is currently unavailable. H
 - client event register
 - server event register
 - disconnect
+- multi packet codec
 - and more...
 
 ## TODO
