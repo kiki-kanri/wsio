@@ -355,9 +355,9 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
 name = "deranged"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41953f86f8a05768a6cda24def994fd2f424b04ec5c719cf89989779f199071"
+checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
 dependencies = [
  "powerfmt",
  "serde_core",
@@ -1018,6 +1018,16 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "parking_lot"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
+dependencies = [
+ "lock_api",
+ "parking_lot_core",
+]
 
 [[package]]
 name = "parking_lot_core"
@@ -2188,7 +2198,7 @@ checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
 
 [[package]]
 name = "wsio-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2204,11 +2214,12 @@ dependencies = [
 
 [[package]]
 name = "wsio-core"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bincode",
  "ciborium",
+ "parking_lot",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -2216,11 +2227,12 @@ dependencies = [
  "serde_with",
  "sonic-rs",
  "tokio",
+ "tungstenite",
 ]
 
 [[package]]
 name = "wsio-server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "bson",
