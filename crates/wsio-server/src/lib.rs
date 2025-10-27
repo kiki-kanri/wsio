@@ -8,7 +8,7 @@ mod builder;
 mod config;
 pub mod connection;
 mod layer;
-mod namespace;
+pub mod namespace;
 mod runtime;
 mod service;
 
