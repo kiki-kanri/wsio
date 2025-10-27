@@ -18,5 +18,9 @@ name = "client"
 path = "client.rs"
 
 [[bin]]
+name = "comprehensive-stress"
+path = "comprehensive_stress.rs"
+
+[[bin]]
 name = "connection-stress"
 path = "connection_stress.rs"

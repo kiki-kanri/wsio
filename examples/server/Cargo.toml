@@ -21,3 +21,7 @@ path = "axum.rs"
 [[bin]]
 name = "server"
 path = "server.rs"
+
+[[bin]]
+name = "stress"
+path = "stress.rs"
