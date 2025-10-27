@@ -10,12 +10,24 @@ Currently confirmed support for Axum; other HTTP servers based on Tower have not
 
 Since development is not yet complete, documentation is currently unavailable. However, you may refer to the results from [Zread](https://zread.ai/ws-io/ws.io-rs). Please note that Zread results may not be accurate.
 
+## Completed
+
+- base client/server
+- server emit
+- server namespace
+- server namespace emit
+- server shutdown
+- namespace shutdown
+- client emit and buffer
+- client auto reconnect
+- client event register
+- server event register
+- disconnect
+- and more...
+
 ## TODO
 
-- server emit
-- namespace emit
-- server on/off handlers and multiple handlers of same event
-- client on/off handlers and multiple handlers of same event
+- any todo comments
 - rooms
 - to rooms and emit
 - check errors and efficacy
