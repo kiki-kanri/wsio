@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use ::bincode::{
     config::standard,
     serde::{
@@ -23,8 +21,6 @@ use super::super::{
 struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketBincodeCodec;
 
-static EMPTY_DATA_ENCODED: LazyLock<Vec<u8>> = LazyLock::new(|| encode_to_vec((), standard()).unwrap());
-
 impl WsIoPacketBincodeCodec {
     pub(super) const IS_TEXT: bool = false;
 
@@ -42,11 +38,6 @@ impl WsIoPacketBincodeCodec {
     pub(super) fn decode_data<D: DeserializeOwned>(&self, bytes: &[u8]) -> Result<D> {
         let (data, _) = decode_from_slice(bytes, standard())?;
         Ok(data)
-    }
-
-    #[inline]
-    pub(super) fn empty_data_encoded(&self) -> &[u8] {
-        EMPTY_DATA_ENCODED.as_ref()
     }
 
     #[inline]

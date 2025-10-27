@@ -1,7 +1,4 @@
-use std::{
-    io::Cursor,
-    sync::LazyLock,
-};
+use std::io::Cursor;
 
 use anyhow::Result;
 use ciborium::{
@@ -16,12 +13,6 @@ use serde::{
 use super::super::WsIoPacket;
 
 pub(super) struct WsIoPacketCborCodec;
-
-static EMPTY_DATA_ENCODED: LazyLock<Vec<u8>> = LazyLock::new(|| {
-    let mut buffer = Vec::new();
-    into_writer(&(), &mut buffer).unwrap();
-    buffer
-});
 
 impl WsIoPacketCborCodec {
     pub(super) const IS_TEXT: bool = false;
@@ -41,11 +32,6 @@ impl WsIoPacketCborCodec {
         let mut buffer = Vec::new();
         into_writer(packet, &mut buffer)?;
         Ok(buffer)
-    }
-
-    #[inline]
-    pub(super) fn empty_data_encoded(&self) -> &[u8] {
-        EMPTY_DATA_ENCODED.as_ref()
     }
 
     #[inline]

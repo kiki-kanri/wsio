@@ -3,11 +3,14 @@ use std::{
         Any,
         TypeId,
     },
-    collections::HashMap,
+    collections::{
+        HashMap,
+        hash_map::Entry,
+    },
     pin::Pin,
     sync::{
         Arc,
-        RwLock,
+        LazyLock,
         atomic::{
             AtomicU32,
             Ordering,
@@ -16,123 +19,151 @@ use std::{
 };
 
 use anyhow::Result;
+use parking_lot::RwLock;
 use serde::de::DeserializeOwned;
+use tokio::spawn;
 
 use crate::packet::codecs::WsIoPacketCodec;
 
-type DataDecoder =
-    Box<dyn Fn(&[u8], &WsIoPacketCodec) -> Result<Box<dyn Any + Send + Sync + 'static>> + Send + Sync + 'static>;
+// Constants/Statics
+static EMPTY_EVENT_DATA_ANY_ARC: LazyLock<Arc<dyn Any + Send + Sync>> = LazyLock::new(|| Arc::new(()));
 
-type Handler<T> = Box<
-    dyn for<'a> Fn(Arc<T>, &'a (dyn Any + Send + Sync + 'a)) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>
+// Types
+type DataDecoder = fn(&[u8], &WsIoPacketCodec) -> Result<Arc<dyn Any + Send + Sync>>;
+type Handler<T> = Arc<
+    dyn Fn(Arc<T>, Arc<dyn Any + Send + Sync>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
         + Sync
         + 'static,
 >;
 
-pub struct WsIoEventRegistry<T> {
-    data_decoders: RwLock<HashMap<String, DataDecoder>>,
-    data_type_ids: RwLock<HashMap<String, TypeId>>,
-    handlers: RwLock<HashMap<String, HashMap<u32, Handler<T>>>>,
+// Structs
+struct EventEntry<T> {
+    data_decoder: DataDecoder,
+    data_type_id: TypeId,
+    handlers: RwLock<HashMap<u32, Handler<T>>>,
+}
+
+pub struct WsIoEventRegistry<T: Send + Sync + 'static> {
+    event_entries: RwLock<HashMap<String, Arc<EventEntry<T>>>>,
     next_handler_id: AtomicU32,
+    packet_codec: WsIoPacketCodec,
 }
 
-impl<T> Default for WsIoEventRegistry<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> WsIoEventRegistry<T> {
+impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(packet_codec: WsIoPacketCodec) -> Self {
         Self {
-            data_decoders: RwLock::new(HashMap::new()),
-            data_type_ids: RwLock::new(HashMap::new()),
-            handlers: RwLock::new(HashMap::new()),
+            event_entries: RwLock::new(HashMap::new()),
             next_handler_id: AtomicU32::new(0),
+            packet_codec,
         }
     }
 
     // Public methods
 
     #[inline]
-    pub fn off(&self, event: impl Into<String>) {
-        let event = event.into();
-        self.data_decoders.write().unwrap().remove(&event);
-        self.data_type_ids.write().unwrap().remove(&event);
-        self.handlers.write().unwrap().remove(&event);
+    pub fn dispatch_event_packet(&self, t: Arc<T>, event: impl AsRef<str>, packet_data: Option<Vec<u8>>) {
+        let Some(event_entry) = self.event_entries.read().get(event.as_ref()).cloned() else {
+            return;
+        };
+
+        let packet_codec = self.packet_codec;
+        // TODO: task manager
+        spawn(async move {
+            let data = match packet_data {
+                Some(bytes) => match (event_entry.data_decoder)(&bytes, &packet_codec) {
+                    Ok(data) => data,
+                    Err(_) => return,
+                },
+                None => EMPTY_EVENT_DATA_ANY_ARC.clone(),
+            };
+
+            for handler in event_entry.handlers.read().values() {
+                let data = data.clone();
+                let handler = handler.clone();
+                let t = t.clone();
+                spawn(async move {
+                    let _ = handler(t, data).await;
+                });
+            }
+        });
     }
 
     #[inline]
-    pub fn off_by_handler_id(&self, event: impl Into<String>, handler_id: u32) {
-        let event = event.into();
-        let mut handlers_map = self.handlers.write().unwrap();
-        if let Some(handlers) = handlers_map.get_mut(&event) {
+    pub fn off(&self, event: impl AsRef<str>) {
+        self.event_entries.write().remove(event.as_ref());
+    }
+
+    #[inline]
+    pub fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
+        let event = event.as_ref();
+        let mut event_entries = self.event_entries.write();
+        let remove_event = if let Some(event_entry) = event_entries.get_mut(event) {
+            let mut handlers = event_entry.handlers.write();
             handlers.remove(&handler_id);
-            if handlers.is_empty() {
-                drop(handlers_map);
-                self.off(event);
-            }
+            handlers.is_empty()
+        } else {
+            false
+        };
+
+        if remove_event {
+            event_entries.remove(event);
         }
     }
 
+    // TODO: data excluder
     #[inline]
     pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
     where
-        H: Fn(Arc<T>, &D) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<T>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {
-        // Resolve the concrete TypeId of the handler payload type `D`
         let data_type_id = TypeId::of::<D>();
         let event = event.into();
 
-        // --------------------------------------------------------------------
-        // Validate data type consistency
-        // Each event name can only be associated with a single payload type `D`.
-        // If a handler for the same event name was previously registered with
-        // a different `D`, this indicates a programming error — panic early.
-        // --------------------------------------------------------------------
-        if let Some(type_id) = self.data_type_ids.read().unwrap().get(&event)
-            && *type_id != data_type_id
-        {
-            panic!(
-                "Event '{}' already registered with different data type — each event name must correspond to exactly one payload type.",
-                &event
-            );
-        } else {
-            // ----------------------------------------------------------------
-            // Register the payload type and its decoder
-            // For a new event name, store both:
-            //   1. The TypeId of its associated payload type `D`
-            //   2. A dynamic decoder closure capable of deserializing bytes
-            //      into `D` via the configured `WsIoPacketCodec`
-            // ----------------------------------------------------------------
-            self.data_type_ids.write().unwrap().insert(event.clone(), data_type_id);
-            self.data_decoders.write().unwrap().insert(
-                event.clone(),
-                Box::new(|bytes, packet_codec| Ok(Box::new(packet_codec.decode_data::<D>(bytes)?))),
-            );
-        }
+        let mut event_entries = self.event_entries.write();
+        let event_entry = match event_entries.entry(event.clone()) {
+            Entry::Occupied(occupied) => {
+                let event_entry = occupied.into_mut();
+                assert_eq!(
+                    event_entry.data_type_id, data_type_id,
+                    "Event '{}' already registered with a different data type — each event name must correspond to exactly one payload type.",
+                    event
+                );
 
-        // --------------------------------------------------------------------
-        // Register the handler
-        // Acquire a unique handler ID and insert the user-provided closure
-        // into the event’s handler map. Each handler is wrapped in a boxed
-        // dynamic async function that:
-        //   - Receives an `Arc<T>` connection reference
-        //   - Downcasts the dynamically-typed data back to `&D`
-        //   - Executes the original user handler asynchronously
-        // --------------------------------------------------------------------
-        let mut handlers = self.handlers.write().unwrap();
-        let handlers = handlers.entry(event).or_default();
+                event_entry
+            }
+            Entry::Vacant(vacant) => vacant.insert(Arc::new(EventEntry {
+                data_decoder: decode_data_as_any_arc::<D>,
+                data_type_id,
+                handlers: RwLock::new(HashMap::new()),
+            })),
+        };
+
         let handler_id = self.next_handler_id.fetch_add(1, Ordering::Relaxed);
-        handlers.insert(
+        event_entry.handlers.write().insert(
             handler_id,
-            Box::new(move |connection, data| Box::pin(handler(connection, data.downcast_ref().unwrap()))),
+            Arc::new(move |connection, data| {
+                if (*data).type_id() != data_type_id {
+                    return Box::pin(async { Ok(()) });
+                }
+
+                Box::pin(handler(connection, data.downcast().unwrap()))
+            }),
         );
 
         handler_id
     }
+}
+
+// Functions
+
+#[inline]
+fn decode_data_as_any_arc<D: DeserializeOwned + Send + Sync + 'static>(
+    bytes: &[u8],
+    packet_codec: &WsIoPacketCodec,
+) -> Result<Arc<dyn Any + Send + Sync>> {
+    Ok(Arc::new(packet_codec.decode_data::<D>(bytes)?))
 }

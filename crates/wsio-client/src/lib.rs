@@ -53,19 +53,19 @@ impl WsIoClient {
     }
 
     #[inline]
-    pub fn off(&self, event: impl Into<String>) {
+    pub fn off(&self, event: impl AsRef<str>) {
         self.0.off(event);
     }
 
     #[inline]
-    pub fn off_by_handler_id(&self, event: impl Into<String>, handler_id: u32) {
+    pub fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
         self.0.off_by_handler_id(event, handler_id);
     }
 
     #[inline]
     pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
     where
-        H: Fn(Arc<WsIoClientConnection>, &D) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {

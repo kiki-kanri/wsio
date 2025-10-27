@@ -64,7 +64,7 @@ pub(crate) struct WsIoClientRuntime {
     event_message_flush_task: Mutex<Option<JoinHandle<()>>>,
     event_message_send_rx: Mutex<Receiver<Message>>,
     event_message_send_tx: Sender<Message>,
-    event_registry: WsIoEventRegistry<WsIoClientConnection>,
+    pub(crate) event_registry: WsIoEventRegistry<WsIoClientConnection>,
     operate_lock: Mutex<()>,
     status: AtomicStatus<RuntimeStatus>,
     wake_reconnect_wait_notify: Notify,
@@ -74,6 +74,7 @@ impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
         let channel_capacity = channel_capacity_from_websocket_config(&config.websocket_config);
         let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
+        let event_registry = WsIoEventRegistry::new(config.packet_codec);
         Arc::new(Self {
             config,
             connection: ArcSwapOption::new(None),
@@ -82,7 +83,7 @@ impl WsIoClientRuntime {
             event_message_flush_task: Mutex::new(None),
             event_message_send_rx: Mutex::new(event_message_send_rx),
             event_message_send_tx,
-            event_registry: WsIoEventRegistry::new(),
+            event_registry,
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
             wake_reconnect_wait_notify: Notify::new(),
@@ -204,19 +205,19 @@ impl WsIoClientRuntime {
     }
 
     #[inline]
-    pub(crate) fn off(&self, event: impl Into<String>) {
+    pub(crate) fn off(&self, event: impl AsRef<str>) {
         self.event_registry.off(event);
     }
 
     #[inline]
-    pub(crate) fn off_by_handler_id(&self, event: impl Into<String>, handler_id: u32) {
+    pub(crate) fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
         self.event_registry.off_by_handler_id(event, handler_id);
     }
 
     #[inline]
     pub(crate) fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
     where
-        H: Fn(Arc<WsIoClientConnection>, &D) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {

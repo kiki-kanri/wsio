@@ -9,10 +9,15 @@ use num_enum::{
     TryFromPrimitive,
 };
 use tokio::{
+    select,
     spawn,
     sync::{
         Mutex,
-        mpsc::Receiver,
+        mpsc::{
+            Receiver,
+            Sender,
+            channel,
+        },
     },
     task::JoinHandle,
     time::{
@@ -25,7 +30,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     core::{
-        connection::core::WsIoConnectionCore,
+        atomic::status::AtomicStatus,
+        channel_capacity_from_websocket_config,
         packet::{
             WsIoPacket,
             WsIoPacketType,
@@ -49,22 +55,27 @@ enum ConnectionStatus {
 }
 
 pub struct WsIoClientConnection {
-    core: WsIoConnectionCore<ConnectionStatus>,
+    cancel_token: CancellationToken,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
+    message_tx: Sender<Message>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
+    status: AtomicStatus<ConnectionStatus>,
 }
 
 impl WsIoClientConnection {
     #[inline]
     pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
-        let (core, message_rx) = WsIoConnectionCore::new(ConnectionStatus::Created, &runtime.config.websocket_config);
+        let channel_capacity = channel_capacity_from_websocket_config(&runtime.config.websocket_config);
+        let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
-                core,
+                cancel_token: CancellationToken::new(),
                 init_timeout_task: Mutex::new(None),
+                message_tx,
                 ready_timeout_task: Mutex::new(None),
                 runtime,
+                status: AtomicStatus::new(ConnectionStatus::Created),
             }),
             message_rx,
         )
@@ -77,11 +88,20 @@ impl WsIoClientConnection {
         Ok(())
     }
 
+    #[inline]
+    fn handle_event_packet(self: &Arc<Self>, event: &str, packet_data: Option<Vec<u8>>) -> Result<()> {
+        self.runtime
+            .event_registry
+            .dispatch_event_packet(self.clone(), event, packet_data);
+
+        Ok(())
+    }
+
     async fn handle_init_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
         // Verify current state; only valid from AwaitingInit → Initiating
-        let status = self.core.status.get();
+        let status = self.status.get();
         match status {
-            ConnectionStatus::AwaitingInit => self.core.status.try_transition(status, ConnectionStatus::Initiating)?,
+            ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
             _ => bail!("Received init packet in invalid status: {:#?}", status),
         }
 
@@ -92,15 +112,14 @@ impl WsIoClientConnection {
         let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(bytes)?;
 
         // Transition state to AwaitingReady
-        self.core
-            .status
+        self.status
             .try_transition(ConnectionStatus::Initiating, ConnectionStatus::AwaitingReady)?;
 
         // Spawn ready-timeout watchdog to close connection if Ready is not received in time
         let connection = self.clone();
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.ready_packet_timeout).await;
-            if connection.core.status.is(ConnectionStatus::AwaitingReady) {
+            if connection.status.is(ConnectionStatus::AwaitingReady) {
                 connection.close();
             }
         }));
@@ -117,7 +136,7 @@ impl WsIoClientConnection {
                 .await??;
 
                 // Send Auth packet only if still in AwaitingReady state
-                if self.core.status.is(ConnectionStatus::AwaitingReady) {
+                if self.status.is(ConnectionStatus::AwaitingReady) {
                     self.send_packet(&WsIoPacket::new(WsIoPacketType::Auth, None, Some(auth_data)))
                         .await?;
                 }
@@ -131,9 +150,9 @@ impl WsIoClientConnection {
 
     async fn handle_ready_packet(self: &Arc<Self>) -> Result<()> {
         // Verify current state; only valid from AwaitingReady → Ready
-        let status = self.core.status.get();
+        let status = self.status.get();
         match status {
-            ConnectionStatus::AwaitingReady => self.core.status.try_transition(status, ConnectionStatus::Ready)?,
+            ConnectionStatus::AwaitingReady => self.status.try_transition(status, ConnectionStatus::Ready)?,
             _ => bail!("Received ready packet in invalid status: {:#?}", status),
         }
 
@@ -155,7 +174,6 @@ impl WsIoClientConnection {
 
     async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
         Ok(self
-            .core
             .message_tx
             .send(self.runtime.encode_packet_to_message(packet)?)
             .await?)
@@ -164,14 +182,14 @@ impl WsIoClientConnection {
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         // Set connection state to Closing
-        self.core.status.store(ConnectionStatus::Closing);
+        self.status.store(ConnectionStatus::Closing);
 
         // Abort timeout tasks if still active
         abort_locked_task(&self.init_timeout_task).await;
         abort_locked_task(&self.ready_timeout_task).await;
 
         // Cancel all ongoing operations via cancel token
-        self.core.cancel_token.cancel();
+        self.cancel_token.cancel();
 
         // Invoke on_connection_close handler with timeout protection if configured
         if let Some(on_connection_close_handler) = &self.runtime.config.on_connection_close_handler {
@@ -183,25 +201,33 @@ impl WsIoClientConnection {
         }
 
         // Set connection state to Closed
-        self.core.status.store(ConnectionStatus::Closed);
+        self.status.store(ConnectionStatus::Closed);
     }
 
     #[inline]
     pub(crate) fn close(&self) {
         // Skip if connection is already Closing or Closed, otherwise set connection state to Closing
-        match self.core.status.get() {
+        match self.status.get() {
             ConnectionStatus::Closed | ConnectionStatus::Closing => return,
-            _ => self.core.status.store(ConnectionStatus::Closing),
+            _ => self.status.store(ConnectionStatus::Closing),
         }
 
         // Send websocket close frame to initiate graceful shutdown
-        let _ = self.core.message_tx.try_send(Message::Close(None));
+        let _ = self.message_tx.try_send(Message::Close(None));
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
+        // TODO: lazy load
         let packet = self.runtime.config.packet_codec.decode(bytes)?;
         match packet.r#type {
             WsIoPacketType::Disconnect => self.handle_disconnect_packet().await,
+            WsIoPacketType::Event => {
+                if let Some(event) = packet.key.as_deref() {
+                    self.handle_event_packet(event, packet.data)
+                } else {
+                    bail!("Event packet missing key");
+                }
+            }
             WsIoPacketType::Init => {
                 if let Some(packet_data) = packet.data.as_deref() {
                     self.handle_init_packet(packet_data).await
@@ -215,34 +241,40 @@ impl WsIoClientConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) {
-        self.core.status.store(ConnectionStatus::AwaitingInit);
+        self.status.store(ConnectionStatus::AwaitingInit);
         let connection = self.clone();
         *self.init_timeout_task.lock().await = Some(spawn(async move {
             sleep(connection.runtime.config.init_packet_timeout).await;
-            if connection.core.status.is(ConnectionStatus::AwaitingInit) {
+            if connection.status.is(ConnectionStatus::AwaitingInit) {
                 connection.close();
             }
         }));
     }
 
     pub(crate) async fn send_event_message(&self, message: Message) -> Result<()> {
-        let status = self.core.status.get();
+        let status = self.status.get();
         if status != ConnectionStatus::Ready {
             bail!("Cannot send event message in invalid status: {:#?}", status);
         }
 
-        Ok(self.core.message_tx.send(message).await?)
+        Ok(self.message_tx.send(message).await?)
     }
 
     // Public methods
 
     #[inline]
     pub fn cancel_token(&self) -> &CancellationToken {
-        &self.core.cancel_token
+        &self.cancel_token
     }
 
     #[inline]
     pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
-        self.core.spawn_task(future);
+        let cancel_token = self.cancel_token.clone();
+        spawn(async move {
+            select! {
+                _ = cancel_token.cancelled() => {},
+                _ = future => {},
+            }
+        });
     }
 }
