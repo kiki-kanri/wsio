@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use serde::Serialize;
 pub use wsio_core as core;
 
 mod builder;
@@ -33,6 +34,10 @@ impl WsIoServer {
     #[inline]
     pub fn connection_count(&self) -> usize {
         self.0.connection_count()
+    }
+
+    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+        self.0.emit(event, data).await
     }
 
     pub fn layer(&self) -> WsIoServerLayer {

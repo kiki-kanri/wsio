@@ -13,6 +13,7 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
+use serde::Serialize;
 
 use crate::{
     config::WsIoServerConfig,
@@ -25,7 +26,7 @@ use crate::{
 };
 
 #[repr(u8)]
-#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 pub(crate) enum WsIoServerRuntimeStatus {
     Running,
     Stopped,
@@ -54,6 +55,23 @@ impl WsIoServerRuntime {
     #[inline]
     pub(crate) fn connection_count(&self) -> usize {
         self.connections.len()
+    }
+
+    pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+        let status = self.status.get();
+        if status != WsIoServerRuntimeStatus::Running {
+            bail!("Cannot emit event in invalid status: {:#?}", status);
+        }
+
+        let event = Arc::new(event.into());
+        join_all(self.namespaces.iter().map(|entry| {
+            let event = event.clone();
+            let namespace = entry.value().clone();
+            async move { namespace.emit(&*event, data).await }
+        }))
+        .await;
+
+        Ok(())
     }
 
     #[inline]
