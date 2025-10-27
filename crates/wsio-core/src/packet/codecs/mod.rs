@@ -6,11 +6,18 @@ use serde::{
 
 #[cfg(feature = "packet-codec-bincode")]
 mod bincode;
+
 #[cfg(feature = "packet-codec-cbor")]
 mod cbor;
+
 #[cfg(feature = "packet-codec-msgpack")]
 mod msgpack;
+
+#[cfg(feature = "packet-codec-postcard")]
+mod postcard;
+
 mod serde_json;
+
 #[cfg(feature = "packet-codec-sonic-rs")]
 mod sonic_rs;
 
@@ -20,6 +27,8 @@ use self::bincode::WsIoPacketBincodeCodec;
 use self::cbor::WsIoPacketCborCodec;
 #[cfg(feature = "packet-codec-msgpack")]
 use self::msgpack::WsIoPacketMsgPackCodec;
+#[cfg(feature = "packet-codec-postcard")]
+use self::postcard::WsIoPacketPostcardCodec;
 use self::serde_json::WsIoPacketSerdeJsonCodec;
 #[cfg(feature = "packet-codec-sonic-rs")]
 use self::sonic_rs::WsIoPacketSonicRsCodec;
@@ -35,6 +44,9 @@ pub enum WsIoPacketCodec {
 
     #[cfg(feature = "packet-codec-msgpack")]
     MsgPack,
+
+    #[cfg(feature = "packet-codec-postcard")]
+    Postcard,
 
     SerdeJson,
 
@@ -55,6 +67,9 @@ impl WsIoPacketCodec {
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.decode(bytes),
 
+            #[cfg(feature = "packet-codec-postcard")]
+            Self::Postcard => WsIoPacketPostcardCodec.decode(bytes),
+
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode(bytes),
 
             #[cfg(feature = "packet-codec-sonic-rs")]
@@ -73,6 +88,9 @@ impl WsIoPacketCodec {
 
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.decode_data(bytes),
+
+            #[cfg(feature = "packet-codec-postcard")]
+            Self::Postcard => WsIoPacketPostcardCodec.decode_data(bytes),
 
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.decode_data(bytes),
 
@@ -93,6 +111,9 @@ impl WsIoPacketCodec {
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.encode(packet.clone()),
 
+            #[cfg(feature = "packet-codec-postcard")]
+            Self::Postcard => WsIoPacketPostcardCodec.encode(packet.clone()),
+
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode(packet),
 
             #[cfg(feature = "packet-codec-sonic-rs")]
@@ -112,6 +133,9 @@ impl WsIoPacketCodec {
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec.encode_data(data),
 
+            #[cfg(feature = "packet-codec-postcard")]
+            Self::Postcard => WsIoPacketPostcardCodec.encode_data(data),
+
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode_data(data),
 
             #[cfg(feature = "packet-codec-sonic-rs")]
@@ -130,6 +154,9 @@ impl WsIoPacketCodec {
 
             #[cfg(feature = "packet-codec-msgpack")]
             Self::MsgPack => WsIoPacketMsgPackCodec::IS_TEXT,
+
+            #[cfg(feature = "packet-codec-postcard")]
+            Self::Postcard => WsIoPacketPostcardCodec::IS_TEXT,
 
             Self::SerdeJson => WsIoPacketSerdeJsonCodec::IS_TEXT,
 
