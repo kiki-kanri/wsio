@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{
+    Result,
+    bail,
+};
 use bson::oid::ObjectId;
 use dashmap::DashMap;
 use futures_util::{
@@ -18,6 +21,7 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
+use serde::Serialize;
 use tokio::{
     join,
     select,
@@ -50,7 +54,7 @@ use crate::{
 };
 
 #[repr(u8)]
-#[derive(Debug, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum NamespaceStatus {
     Running,
     Stopped,
@@ -206,6 +210,28 @@ impl WsIoServerNamespace {
     #[inline]
     pub fn connection_count(&self) -> usize {
         self.connections.len()
+    }
+
+    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+        let status = self.status.get();
+        if status != NamespaceStatus::Running {
+            bail!("Cannot emit event in invalid status: {:#?}", status);
+        }
+
+        let message = self.encode_packet_to_message(&WsIoPacket::new_event(
+            event,
+            data.map(|data| self.config.packet_codec.encode_data(data))
+                .transpose()?,
+        ))?;
+
+        join_all(self.connections.iter().map(|entry| {
+            let connection = entry.value().clone();
+            let message = message.clone();
+            async move { connection.emit_message(message).await }
+        }))
+        .await;
+
+        Ok(())
     }
 
     #[inline]

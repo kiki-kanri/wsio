@@ -156,6 +156,16 @@ impl WsIoServerConnection {
         Ok(())
     }
 
+    #[inline]
+    fn ensure_status_ready(&self) -> Result<()> {
+        let status = self.status.get();
+        if status != ConnectionStatus::Ready {
+            bail!("Cannot emit event in invalid status: {:#?}", status);
+        }
+
+        Ok(())
+    }
+
     async fn handle_auth_packet(self: &Arc<Self>, packet_data: &[u8]) -> Result<()> {
         // Verify current state; only valid from AwaitingAuth → Authenticating
         let status = self.status.get();
@@ -310,17 +320,18 @@ impl WsIoServerConnection {
     }
 
     pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
-        let status = self.status.get();
-        if status != ConnectionStatus::Ready {
-            bail!("Cannot emit event in invalid status: {:#?}", status);
-        }
-
+        self.ensure_status_ready()?;
         self.send_packet(&WsIoPacket::new_event(
             event,
             data.map(|data| self.namespace.config.packet_codec.encode_data(data))
                 .transpose()?,
         ))
         .await
+    }
+
+    pub async fn emit_message(&self, message: Message) -> Result<()> {
+        self.ensure_status_ready()?;
+        Ok(self.message_tx.send(message).await?)
     }
 
     #[cfg(feature = "connection-extensions")]
