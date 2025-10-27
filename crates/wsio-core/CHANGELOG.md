@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.4.0...wsio-core-v0.5.0) - 2025-10-27 08:04
+
+### 🏡 Chore
+
+- *(core)* remove unused or unimplemented TODOs ([a2435d4](https://github.com/ws-io/ws.io-rs/commit/a2435d4))
+- *(core)* tidy up dependencies ([da06bcb](https://github.com/ws-io/ws.io-rs/commit/da06bcb))
+- mark `WsIoPacketCodec.is_text` method is inline ([d43ff08](https://github.com/ws-io/ws.io-rs/commit/d43ff08))
+
+### 💅 Refactors
+
+- further simplify and merge parts of code ([bed226c](https://github.com/ws-io/ws.io-rs/commit/bed226c))
+- simplify and modify parts of the code ([4923c46](https://github.com/ws-io/ws.io-rs/commit/4923c46))
+- clean up and optimize code ([0282065](https://github.com/ws-io/ws.io-rs/commit/0282065))
+- *(core)* remove unused generic type definitions ([73387d7](https://github.com/ws-io/ws.io-rs/commit/73387d7))
+
+### 🚀 Enhancements
+
+- add postcard packet codec ([1f1297f](https://github.com/ws-io/ws.io-rs/commit/1f1297f))
+- clean up and optimize code, implement initial event handling after receiving event ([8c6e461](https://github.com/ws-io/ws.io-rs/commit/8c6e461))
+- add event registration functionality ([2dfcb1d](https://github.com/ws-io/ws.io-rs/commit/2dfcb1d))
+
 ## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.3.2...wsio-core-v0.4.0) - 2025-10-25 07:21
 
 ### 💅 Refactors

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.5.0...wsio-server-v0.5.1) - 2025-10-27 08:04
+
+### 💅 Refactors
+
+- further simplify and merge parts of code ([bed226c](https://github.com/ws-io/ws.io-rs/commit/bed226c))
+- simplify and modify parts of the code ([4923c46](https://github.com/ws-io/ws.io-rs/commit/4923c46))
+- clean up and optimize code ([0282065](https://github.com/ws-io/ws.io-rs/commit/0282065))
+
+### 🚀 Enhancements
+
+- add postcard packet codec ([1f1297f](https://github.com/ws-io/ws.io-rs/commit/1f1297f))
+- *(server)* add `emit` method to server ([6439a60](https://github.com/ws-io/ws.io-rs/commit/6439a60))
+- *(server)* add namespace emit method ([8343ee8](https://github.com/ws-io/ws.io-rs/commit/8343ee8))
+- clean up and optimize code, implement initial event handling after receiving event ([8c6e461](https://github.com/ws-io/ws.io-rs/commit/8c6e461))
+- add event registration functionality ([2dfcb1d](https://github.com/ws-io/ws.io-rs/commit/2dfcb1d))
+
 ## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.4.0...wsio-server-v0.5.0) - 2025-10-25 07:21
 
 ### 🏡 Chore

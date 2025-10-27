@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.4.0...wsio-client-v0.4.1) - 2025-10-27 08:04
+
+### 💅 Refactors
+
+- further simplify and merge parts of code ([bed226c](https://github.com/ws-io/ws.io-rs/commit/bed226c))
+- simplify and modify parts of the code ([4923c46](https://github.com/ws-io/ws.io-rs/commit/4923c46))
+- clean up and optimize code ([0282065](https://github.com/ws-io/ws.io-rs/commit/0282065))
+
+### 🚀 Enhancements
+
+- add postcard packet codec ([1f1297f](https://github.com/ws-io/ws.io-rs/commit/1f1297f))
+- clean up and optimize code, implement initial event handling after receiving event ([8c6e461](https://github.com/ws-io/ws.io-rs/commit/8c6e461))
+- add event registration functionality ([2dfcb1d](https://github.com/ws-io/ws.io-rs/commit/2dfcb1d))
+
 ## [0.4.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.3.0...wsio-client-v0.4.0) - 2025-10-25 07:21
 
 ### 🏡 Chore
