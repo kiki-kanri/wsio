@@ -112,7 +112,6 @@ impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
         }
     }
 
-    // TODO: data excluder
     #[inline]
     pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
     where
