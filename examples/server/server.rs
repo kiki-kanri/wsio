@@ -115,6 +115,14 @@ async fn main() -> Result<()> {
         .packet_codec(WsIoPacketCodec::MsgPack)
         .register()?;
 
+    // Register /postcard namespace
+    WS_IO_SERVER
+        .new_namespace_builder("/postcard")?
+        .on_connect(on_connect)
+        .on_ready(on_ready)
+        .packet_codec(WsIoPacketCodec::Postcard)
+        .register()?;
+
     // Register /serde-json namespace
     WS_IO_SERVER
         .new_namespace_builder("/serde-json")?

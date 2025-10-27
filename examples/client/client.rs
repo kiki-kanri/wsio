@@ -77,6 +77,19 @@ static MSG_PACK: LazyLock<WsIoClient> = LazyLock::new(|| {
     client
 });
 
+static POSTCARD: LazyLock<WsIoClient> = LazyLock::new(|| {
+    const NAMESPACE: &str = "/postcard";
+    let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
+        .unwrap()
+        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
+        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .packet_codec(WsIoPacketCodec::Postcard)
+        .build();
+
+    client.on("test", |_, _: Arc<()>| on_event(NAMESPACE));
+    client
+});
+
 static SERDE_JSON: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/serde-json";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
@@ -127,6 +140,7 @@ async fn main() -> Result<()> {
         CBOR.connect(),
         DISCONNECT.connect(),
         MSG_PACK.connect(),
+        POSTCARD.connect(),
         SERDE_JSON.connect(),
         SONIC_RS.connect(),
     );
@@ -138,6 +152,7 @@ async fn main() -> Result<()> {
         CBOR.disconnect(),
         DISCONNECT.disconnect(),
         MSG_PACK.disconnect(),
+        POSTCARD.disconnect(),
         SERDE_JSON.disconnect(),
         SONIC_RS.disconnect(),
     );
