@@ -65,7 +65,7 @@ async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
         connection.namespace().server().connection_count()
     );
 
-    connection.emit("test", Some(&("123".to_string(),))).await?;
+    connection.emit::<()>("test", None).await?;
     Ok(())
 }
 
