@@ -3,7 +3,8 @@ name = "wsio-server"
 version = "0.6.0"
 
 authors.workspace = true
-description = "server"
+categories.workspace = true
+description = "Async WebSocket server framework for ws.io — provides event-based real-time messaging, namespaces, and room-like broadcasting."
 edition.workspace = true
 homepage.workspace = true
 include = [
@@ -12,6 +13,7 @@ include = [
   "src/**/*",
 ]
 
+keywords.workspace = true
 license.workspace = true
 readme = "./README.md"
 repository.workspace = true

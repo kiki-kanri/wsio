@@ -7,7 +7,27 @@ resolver = "3"
 
 [workspace.package]
 authors = ["kiki-kanri"]
+categories = [
+  "asynchronous",
+  "concurrency",
+  "network-programming",
+  "web-programming::websocket",
+]
+
+description = "A lightweight, async WebSocket framework inspired by Socket.IO — composed of ws-io-core, ws-io-client, and ws-io-server crates."
 edition = "2024"
 homepage = "https://github.com/ws-io/ws.io-rs"
+keywords = [
+  "async",
+  "client",
+  "messaging",
+  "network",
+  "realtime",
+  "server",
+  "socket.io",
+  "websocket",
+  "ws",
+]
+
 license = "MIT"
 repository = "https://github.com/ws-io/ws.io-rs"
