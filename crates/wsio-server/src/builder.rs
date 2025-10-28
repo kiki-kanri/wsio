@@ -9,6 +9,7 @@ use crate::{
     runtime::WsIoServerRuntime,
 };
 
+// Structs
 pub struct WsIoServerBuilder {
     config: WsIoServerConfig,
 }

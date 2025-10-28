@@ -12,6 +12,7 @@ use serde::{
 
 use super::super::WsIoPacket;
 
+// Structs
 pub(super) struct WsIoPacketCborCodec;
 
 impl WsIoPacketCborCodec {

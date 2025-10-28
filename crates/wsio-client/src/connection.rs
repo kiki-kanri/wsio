@@ -41,6 +41,7 @@ use crate::{
     runtime::WsIoClientRuntime,
 };
 
+// Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum ConnectionStatus {
@@ -54,6 +55,7 @@ enum ConnectionStatus {
     Readying,
 }
 
+// Structs
 pub struct WsIoClientConnection {
     cancel_token: CancellationToken,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
@@ -82,7 +84,8 @@ impl WsIoClientConnection {
     }
 
     // Private methods
-    async fn handle_disconnect_packet(&self) -> Result<()> {
+    #[inline]
+    fn handle_disconnect_packet(&self) -> Result<()> {
         let runtime = self.runtime.clone();
         spawn(async move { runtime.disconnect().await });
         Ok(())
@@ -97,7 +100,7 @@ impl WsIoClientConnection {
         Ok(())
     }
 
-    async fn handle_init_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
+    async fn handle_init_packet(self: &Arc<Self>, packet_data: &[u8]) -> Result<()> {
         // Verify current state; only valid from AwaitingInit → Initiating
         let status = self.status.get();
         match status {
@@ -109,7 +112,7 @@ impl WsIoClientConnection {
         abort_locked_task(&self.init_timeout_task).await;
 
         // Decode init packet to determine if authentication is required
-        let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(bytes)?;
+        let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(packet_data)?;
 
         // Transition state to AwaitingReady
         self.status
@@ -165,8 +168,7 @@ impl WsIoClientConnection {
         // Invoke on_connection_ready handler if configured
         if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
             // Run handler asynchronously in a detached task
-            let connection = self.clone();
-            self.spawn_task(async move { on_connection_ready_handler(connection).await });
+            self.spawn_task(on_connection_ready_handler(self.clone()));
         }
 
         Ok(())
@@ -220,7 +222,7 @@ impl WsIoClientConnection {
         // TODO: lazy load
         let packet = self.runtime.config.packet_codec.decode(bytes)?;
         match packet.r#type {
-            WsIoPacketType::Disconnect => self.handle_disconnect_packet().await,
+            WsIoPacketType::Disconnect => self.handle_disconnect_packet(),
             WsIoPacketType::Event => {
                 if let Some(event) = packet.key.as_deref() {
                     self.handle_event_packet(event, packet.data)
@@ -252,16 +254,14 @@ impl WsIoClientConnection {
     }
 
     pub(crate) async fn send_event_message(&self, message: Message) -> Result<()> {
-        let status = self.status.get();
-        if status != ConnectionStatus::Ready {
-            bail!("Cannot send event message in invalid status: {:#?}", status);
-        }
+        self.status.ensure(ConnectionStatus::Ready, |status| {
+            format!("Cannot send event message in invalid status: {:#?}", status)
+        })?;
 
         Ok(self.message_tx.send(message).await?)
     }
 
     // Public methods
-
     #[inline]
     pub fn cancel_token(&self) -> &CancellationToken {
         &self.cancel_token

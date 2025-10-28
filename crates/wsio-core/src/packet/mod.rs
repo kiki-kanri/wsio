@@ -10,6 +10,7 @@ use serde_with::skip_serializing_none;
 
 pub mod codecs;
 
+// Enums
 #[repr(u8)]
 #[derive(Clone, Debug, Deserialize_repr, Serialize_repr)]
 pub enum WsIoPacketType {
@@ -20,6 +21,7 @@ pub enum WsIoPacketType {
     Ready = 4,
 }
 
+// Structs
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsIoPacket {
@@ -40,7 +42,6 @@ impl WsIoPacket {
     }
 
     // Public methods
-
     #[inline]
     pub fn new_disconnect() -> Self {
         Self::new(WsIoPacketType::Disconnect, None, None)

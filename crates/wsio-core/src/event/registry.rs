@@ -25,9 +25,6 @@ use tokio::spawn;
 
 use crate::packet::codecs::WsIoPacketCodec;
 
-// Constants/Statics
-static EMPTY_EVENT_DATA_ANY_ARC: LazyLock<Arc<dyn Any + Send + Sync>> = LazyLock::new(|| Arc::new(()));
-
 // Types
 type DataDecoder = fn(&[u8], &WsIoPacketCodec) -> Result<Arc<dyn Any + Send + Sync>>;
 type Handler<T> = Arc<
@@ -61,7 +58,6 @@ impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
     }
 
     // Public methods
-
     #[inline]
     pub fn dispatch_event_packet(&self, t: Arc<T>, event: impl AsRef<str>, packet_data: Option<Vec<u8>>) {
         let Some(event_entry) = self.event_entries.read().get(event.as_ref()).cloned() else {
@@ -157,8 +153,10 @@ impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
     }
 }
 
-// Functions
+// Constants/Statics
+static EMPTY_EVENT_DATA_ANY_ARC: LazyLock<Arc<dyn Any + Send + Sync>> = LazyLock::new(|| Arc::new(()));
 
+// Functions
 #[inline]
 fn decode_data_as_any_arc<D: DeserializeOwned + Send + Sync + 'static>(
     bytes: &[u8],

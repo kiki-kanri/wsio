@@ -18,10 +18,10 @@ use tower_service::Service as TowerService;
 
 mod request;
 
-use request::dispatch_request;
-
+use self::request::dispatch_request;
 use crate::runtime::WsIoServerRuntime;
 
+// Structs
 #[derive(Clone)]
 pub struct WsIoServerService<S> {
     inner: S,

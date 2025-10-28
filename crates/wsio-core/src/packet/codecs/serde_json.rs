@@ -10,6 +10,7 @@ use serde::{
 
 use super::super::WsIoPacket;
 
+// Structs
 pub(super) struct WsIoPacketSerdeJsonCodec;
 
 impl WsIoPacketSerdeJsonCodec {

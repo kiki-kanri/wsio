@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    Weak,
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        Weak,
+    },
 };
 
 use anyhow::{
@@ -13,6 +16,7 @@ use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
+use parking_lot::RwLock;
 use serde::Serialize;
 
 use crate::{
@@ -25,6 +29,7 @@ use crate::{
     },
 };
 
+// Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 pub(crate) enum WsIoServerRuntimeStatus {
@@ -33,10 +38,11 @@ pub(crate) enum WsIoServerRuntimeStatus {
     Stopping,
 }
 
+// Structs
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
-    connections: DashMap<String, Weak<WsIoServerConnection>>,
-    namespaces: DashMap<String, Arc<WsIoServerNamespace>>,
+    connections: DashMap<u64, Weak<WsIoServerConnection>>,
+    namespaces: RwLock<HashMap<String, Arc<WsIoServerNamespace>>>,
     pub(crate) status: AtomicStatus<WsIoServerRuntimeStatus>,
 }
 
@@ -45,28 +51,31 @@ impl WsIoServerRuntime {
         Arc::new(Self {
             config,
             connections: DashMap::new(),
-            namespaces: DashMap::new(),
+            namespaces: RwLock::new(HashMap::new()),
             status: AtomicStatus::new(WsIoServerRuntimeStatus::Running),
         })
     }
 
-    // Protected methods
+    // Private methods
+    #[inline]
+    fn clone_namespaces(&self) -> Vec<Arc<WsIoServerNamespace>> {
+        self.namespaces.read().values().cloned().collect()
+    }
 
+    // Protected methods
     #[inline]
     pub(crate) fn connection_count(&self) -> usize {
         self.connections.len()
     }
 
     pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
-        let status = self.status.get();
-        if status != WsIoServerRuntimeStatus::Running {
-            bail!("Cannot emit event in invalid status: {:#?}", status);
-        }
+        self.status.ensure(WsIoServerRuntimeStatus::Running, |status| {
+            format!("Cannot emit event in invalid status: {:#?}", status)
+        })?;
 
         let event = Arc::new(event.into());
-        join_all(self.namespaces.iter().map(|entry| {
+        join_all(self.clone_namespaces().iter().map(|namespace| {
             let event = event.clone();
-            let namespace = entry.value().clone();
             async move { namespace.emit(&*event, data).await }
         }))
         .await;
@@ -76,33 +85,32 @@ impl WsIoServerRuntime {
 
     #[inline]
     pub(crate) fn get_namespace(&self, path: &str) -> Option<Arc<WsIoServerNamespace>> {
-        self.namespaces.get(path).map(|entry| entry.clone())
+        self.namespaces.read().get(path).cloned()
     }
 
     #[inline]
     pub(crate) fn insert_connection(&self, connection: &Arc<WsIoServerConnection>) {
-        self.connections
-            .insert(connection.sid().into(), Arc::downgrade(connection));
+        self.connections.insert(connection.id(), Arc::downgrade(connection));
     }
 
     #[inline]
     pub(crate) fn insert_namespace(&self, namespace: Arc<WsIoServerNamespace>) -> Result<()> {
-        if self.namespaces.contains_key(namespace.path()) {
+        if self.namespaces.read().contains_key(namespace.path()) {
             bail!("Namespace {} already exists", namespace.path());
         }
 
-        self.namespaces.insert(namespace.path().into(), namespace);
+        self.namespaces.write().insert(namespace.path().into(), namespace);
         Ok(())
     }
 
     #[inline]
     pub(crate) fn namespace_count(&self) -> usize {
-        self.namespaces.len()
+        self.namespaces.read().len()
     }
 
     #[inline]
     pub(crate) fn new_namespace_builder(self: &Arc<Self>, path: &str) -> Result<WsIoServerNamespaceBuilder> {
-        if self.namespaces.contains_key(path) {
+        if self.namespaces.read().contains_key(path) {
             bail!("Namespace {path} already exists");
         }
 
@@ -110,12 +118,12 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn remove_connection(&self, sid: &str) {
-        self.connections.remove(sid);
+    pub(crate) fn remove_connection(&self, id: u64) {
+        self.connections.remove(&id);
     }
 
     pub(crate) async fn remove_namespace(&self, path: &str) {
-        let Some((_, namespace)) = self.namespaces.remove(path) else {
+        let Some(namespace) = self.namespaces.write().remove(path) else {
             return;
         };
 
@@ -129,10 +137,11 @@ impl WsIoServerRuntime {
             _ => unreachable!(),
         }
 
-        join_all(self.namespaces.iter().map(|entry| {
-            let namespace = entry.value().clone();
-            async move { namespace.shutdown().await }
-        }))
+        join_all(
+            self.clone_namespaces()
+                .iter()
+                .map(|namespace| async move { namespace.shutdown().await }),
+        )
         .await;
 
         self.status.store(WsIoServerRuntimeStatus::Stopped);

@@ -17,6 +17,7 @@ use crate::{
     runtime::WsIoServerRuntime,
 };
 
+// Structs
 pub struct WsIoServerNamespaceBuilder {
     config: WsIoServerNamespaceConfig,
     runtime: Arc<WsIoServerRuntime>,

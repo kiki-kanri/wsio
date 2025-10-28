@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{
-    Result,
-    bail,
-};
+use anyhow::Result;
 use arc_swap::ArcSwapOption;
 use futures_util::{
     SinkExt,
@@ -48,6 +45,7 @@ use crate::{
     },
 };
 
+// Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum RuntimeStatus {
@@ -56,6 +54,7 @@ enum RuntimeStatus {
     Stopping,
 }
 
+// Structs
 pub(crate) struct WsIoClientRuntime {
     pub(crate) config: WsIoClientConfig,
     connection: ArcSwapOption<WsIoClientConnection>,
@@ -74,19 +73,18 @@ impl WsIoClientRuntime {
     pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
         let channel_capacity = channel_capacity_from_websocket_config(&config.websocket_config);
         let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
-        let event_registry = WsIoEventRegistry::new(config.packet_codec);
         Arc::new(Self {
-            config,
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             event_message_flush_notify: Notify::new(),
             event_message_flush_task: Mutex::new(None),
             event_message_send_rx: Mutex::new(event_message_send_rx),
             event_message_send_tx,
-            event_registry,
+            event_registry: WsIoEventRegistry::new(config.packet_codec),
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
             wake_reconnect_wait_notify: Notify::new(),
+            config,
         })
     }
 
@@ -141,7 +139,7 @@ impl WsIoClientRuntime {
         }));
     }
 
-    pub(crate) async fn disconnect(self: &Arc<Self>) {
+    pub(crate) async fn disconnect(&self) {
         // Lock to prevent concurrent operation
         let _lock = self.operate_lock.lock().await;
 
@@ -177,10 +175,9 @@ impl WsIoClientRuntime {
     }
 
     pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
-        let status = self.status.get();
-        if status != RuntimeStatus::Running {
-            bail!("Cannot emit event in invalid status: {:#?}", status);
-        }
+        self.status.ensure(RuntimeStatus::Running, |status| {
+            format!("Cannot emit event in invalid status: {:#?}", status)
+        })?;
 
         self.event_message_send_tx
             .send(

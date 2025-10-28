@@ -22,6 +22,7 @@ use crate::{
     runtime::WsIoClientRuntime,
 };
 
+// Structs
 #[derive(Clone)]
 pub struct WsIoClient(Arc<WsIoClientRuntime>);
 

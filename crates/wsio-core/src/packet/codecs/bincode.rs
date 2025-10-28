@@ -17,6 +17,7 @@ use super::super::{
     WsIoPacketType,
 };
 
+// Structs
 #[derive(Deserialize, Serialize)]
 struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketBincodeCodec;

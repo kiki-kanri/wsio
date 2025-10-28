@@ -19,6 +19,7 @@ use crate::{
     runtime::WsIoClientRuntime,
 };
 
+// Structs
 pub struct WsIoClientBuilder {
     config: WsIoClientConfig,
 }

@@ -20,6 +20,7 @@ use url::form_urlencoded;
 
 use crate::runtime::WsIoServerRuntime;
 
+// Functions
 #[inline]
 fn check_header_value<ReqBody>(request: &Request<ReqBody>, name: HeaderName, expected_value: &[u8]) -> bool {
     match request.headers().get(name) {
@@ -73,7 +74,9 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
         None => return respond(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
-    namespace.handle_on_upgrade_request(request.headers().clone(), on_upgrade);
+    namespace
+        .handle_on_upgrade_request(request.headers().clone(), on_upgrade)
+        .await;
 
     Ok(Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)

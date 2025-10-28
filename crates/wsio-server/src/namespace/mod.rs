@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{
-    Result,
-    bail,
-};
-use bson::oid::ObjectId;
+use anyhow::Result;
 use dashmap::DashMap;
 use futures_util::{
     SinkExt,
@@ -26,7 +22,8 @@ use tokio::{
     join,
     select,
     spawn,
-    task::JoinHandle,
+    sync::Mutex,
+    task::JoinSet,
 };
 use tokio_tungstenite::{
     WebSocketStream,
@@ -53,6 +50,7 @@ use crate::{
     },
 };
 
+// Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum NamespaceStatus {
@@ -61,10 +59,11 @@ enum NamespaceStatus {
     Stopping,
 }
 
+// Structs
 pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
-    connections: DashMap<String, Arc<WsIoServerConnection>>,
-    connection_tasks: DashMap<String, JoinHandle<()>>,
+    connections: DashMap<u64, Arc<WsIoServerConnection>>,
+    connection_task_set: Mutex<JoinSet<()>>,
     runtime: Arc<WsIoServerRuntime>,
     status: AtomicStatus<NamespaceStatus>,
 }
@@ -74,19 +73,14 @@ impl WsIoServerNamespace {
         Arc::new(Self {
             config,
             connections: DashMap::new(),
-            connection_tasks: DashMap::new(),
+            connection_task_set: Mutex::new(JoinSet::new()),
             runtime,
             status: AtomicStatus::new(NamespaceStatus::Running),
         })
     }
 
     // Private methods
-    async fn handle_upgraded_request(
-        self: &Arc<Self>,
-        connection_sid: &str,
-        headers: HeaderMap,
-        upgraded: Upgraded,
-    ) -> Result<()> {
+    async fn handle_upgraded_request(self: &Arc<Self>, headers: HeaderMap, upgraded: Upgraded) -> Result<()> {
         // Create ws stream
         let mut ws_stream =
             WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(self.config.websocket_config))
@@ -103,7 +97,7 @@ impl WsIoServerNamespace {
         }
 
         // Create connection
-        let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone(), connection_sid.to_string());
+        let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone());
 
         // Split ws stream and spawn read and write tasks
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
@@ -165,7 +159,6 @@ impl WsIoServerNamespace {
     }
 
     // Protected methods
-
     #[inline]
     pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
         let bytes = self.config.packet_codec.encode(packet)?;
@@ -175,48 +168,37 @@ impl WsIoServerNamespace {
         })
     }
 
-    #[inline]
-    pub(crate) fn handle_on_upgrade_request(self: &Arc<Self>, headers: HeaderMap, on_upgrade: OnUpgrade) {
-        let connection_sid = ObjectId::new().to_string();
+    pub(crate) async fn handle_on_upgrade_request(self: &Arc<Self>, headers: HeaderMap, on_upgrade: OnUpgrade) {
         let namespace = self.clone();
-        self.connection_tasks.insert(
-            connection_sid.clone(),
-            spawn(async move {
-                if let Ok(upgraded) = on_upgrade.await {
-                    let _ = namespace
-                        .handle_upgraded_request(&connection_sid, headers, upgraded)
-                        .await;
-                }
-
-                namespace.connection_tasks.remove(&connection_sid);
-            }),
-        );
+        self.connection_task_set.lock().await.spawn(async move {
+            if let Ok(upgraded) = on_upgrade.await {
+                let _ = namespace.handle_upgraded_request(headers, upgraded).await;
+            }
+        });
     }
 
     #[inline]
     pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
-        self.connections.insert(connection.sid().into(), connection.clone());
+        self.connections.insert(connection.id(), connection.clone());
         self.runtime.insert_connection(&connection);
     }
 
     #[inline]
-    pub(crate) fn remove_connection(&self, sid: &str) {
-        self.connections.remove(sid);
-        self.runtime.remove_connection(sid);
+    pub(crate) fn remove_connection(&self, id: u64) {
+        self.connections.remove(&id);
+        self.runtime.remove_connection(id);
     }
 
     // Public methods
-
     #[inline]
     pub fn connection_count(&self) -> usize {
         self.connections.len()
     }
 
     pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
-        let status = self.status.get();
-        if status != NamespaceStatus::Running {
-            bail!("Cannot emit event in invalid status: {:#?}", status);
-        }
+        self.status.ensure(NamespaceStatus::Running, |status| {
+            format!("Cannot emit event in invalid status: {:#?}", status)
+        })?;
 
         let message = self.encode_packet_to_message(&WsIoPacket::new_event(
             event,
@@ -244,7 +226,6 @@ impl WsIoServerNamespace {
         WsIoServer(self.runtime.clone())
     }
 
-    // Public methods
     pub async fn shutdown(&self) {
         match self.status.get() {
             NamespaceStatus::Stopped => return,
@@ -258,18 +239,8 @@ impl WsIoServerNamespace {
         }))
         .await;
 
-        let connection_sids = self
-            .connection_tasks
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect::<Vec<_>>();
-
-        join_all(
-            connection_sids
-                .iter()
-                .filter_map(|sid| self.connection_tasks.remove(sid).map(|(_, task)| task)),
-        )
-        .await;
+        let mut connection_task_set = self.connection_task_set.lock().await;
+        while connection_task_set.join_next().await.is_some() {}
 
         self.status.store(NamespaceStatus::Stopped);
     }

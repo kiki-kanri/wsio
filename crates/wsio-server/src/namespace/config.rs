@@ -18,6 +18,7 @@ use crate::{
     },
 };
 
+// Types
 type AuthHandler = Box<
     dyn for<'a> Fn(
             Arc<WsIoServerConnection>,
@@ -29,6 +30,7 @@ type AuthHandler = Box<
         + 'static,
 >;
 
+// Structs
 pub(crate) struct WsIoServerNamespaceConfig {
     pub(crate) auth_handler: Option<AuthHandler>,
 

@@ -10,6 +10,7 @@ use serde::{
 
 use super::super::WsIoPacket;
 
+// Structs
 pub(super) struct WsIoPacketSonicRsCodec;
 
 impl WsIoPacketSonicRsCodec {

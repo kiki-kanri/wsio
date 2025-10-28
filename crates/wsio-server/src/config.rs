@@ -4,6 +4,7 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::core::packet::codecs::WsIoPacketCodec;
 
+// Structs
 #[derive(Debug)]
 pub(crate) struct WsIoServerConfig {
     /// Maximum duration allowed for the auth handler to execute.

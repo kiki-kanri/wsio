@@ -9,14 +9,16 @@ use std::{
 use anyhow::{
     Result,
     anyhow,
+    bail,
 };
 
-pub struct AtomicStatus<T: Into<u8> + TryFrom<u8>> {
+// Structs
+pub struct AtomicStatus<T: Eq + Into<u8> + PartialEq + TryFrom<u8>> {
     _marker: PhantomData<T>,
     inner: AtomicU8,
 }
 
-impl<T: Into<u8> + TryFrom<u8>> AtomicStatus<T> {
+impl<T: Eq + Into<u8> + PartialEq + TryFrom<u8>> AtomicStatus<T> {
     #[inline]
     pub fn new(status: T) -> Self {
         Self {
@@ -26,6 +28,15 @@ impl<T: Into<u8> + TryFrom<u8>> AtomicStatus<T> {
     }
 
     // Public methods
+    #[inline]
+    pub fn ensure<F: FnOnce(T) -> String>(&self, expected: T, message: F) -> Result<()> {
+        let status = self.get();
+        if status != expected {
+            bail!("{}", message(status));
+        }
+
+        Ok(())
+    }
 
     #[inline]
     pub fn get(&self) -> T {

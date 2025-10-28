@@ -8,6 +8,7 @@ use std::{
 
 use dashmap::DashMap;
 
+// Structs
 pub struct ConnectionExtensions {
     inner: DashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
@@ -19,7 +20,6 @@ impl ConnectionExtensions {
     }
 
     // Public methods
-
     #[inline]
     pub fn clear<T: Send + Sync + 'static>(&self) {
         self.inner.remove(&TypeId::of::<T>());

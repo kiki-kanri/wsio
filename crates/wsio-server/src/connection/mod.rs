@@ -1,4 +1,11 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    LazyLock,
+    atomic::{
+        AtomicU64,
+        Ordering,
+    },
+};
 
 use anyhow::{
     Result,
@@ -54,6 +61,7 @@ use crate::{
     namespace::WsIoServerNamespace,
 };
 
+// Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum ConnectionStatus {
@@ -66,6 +74,7 @@ enum ConnectionStatus {
     Ready,
 }
 
+// Structs
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: CancellationToken,
@@ -73,20 +82,16 @@ pub struct WsIoServerConnection {
     #[cfg(feature = "connection-extensions")]
     extensions: ConnectionExtensions,
     headers: HeaderMap,
+    id: u64,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
-    sid: String,
     status: AtomicStatus<ConnectionStatus>,
 }
 
 impl WsIoServerConnection {
     #[inline]
-    pub(crate) fn new(
-        headers: HeaderMap,
-        namespace: Arc<WsIoServerNamespace>,
-        sid: String,
-    ) -> (Arc<Self>, Receiver<Message>) {
+    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Arc<Self>, Receiver<Message>) {
         let channel_capacity = channel_capacity_from_websocket_config(&namespace.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
@@ -97,10 +102,10 @@ impl WsIoServerConnection {
                 #[cfg(feature = "connection-extensions")]
                 extensions: ConnectionExtensions::new(),
                 headers,
+                id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
                 message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),
-                sid,
                 status: AtomicStatus::new(ConnectionStatus::Created),
             }),
             message_rx,
@@ -149,8 +154,7 @@ impl WsIoServerConnection {
         // Invoke on_ready handler if configured
         if let Some(on_ready_handler) = self.namespace.config.on_ready_handler.clone() {
             // Run handler asynchronously in a detached task
-            let connection = self.clone();
-            self.spawn_task(async move { on_ready_handler(connection).await });
+            self.spawn_task(on_ready_handler(self.clone()));
         }
 
         Ok(())
@@ -158,10 +162,9 @@ impl WsIoServerConnection {
 
     #[inline]
     fn ensure_status_ready(&self) -> Result<()> {
-        let status = self.status.get();
-        if status != ConnectionStatus::Ready {
-            bail!("Cannot emit event in invalid status: {:#?}", status);
-        }
+        self.status.ensure(ConnectionStatus::Ready, |status| {
+            format!("Cannot emit event in invalid status: {:#?}", status)
+        })?;
 
         Ok(())
     }
@@ -216,7 +219,7 @@ impl WsIoServerConnection {
         abort_locked_task(&self.auth_timeout_task).await;
 
         // Remove connection from namespace
-        self.namespace.remove_connection(&self.sid);
+        self.namespace.remove_connection(self.id);
 
         // Cancel all ongoing operations via cancel token
         self.cancel_token.cancel();
@@ -270,10 +273,9 @@ impl WsIoServerConnection {
 
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
         // Verify current state; only valid Created
-        let status = self.status.get();
-        if !matches!(status, ConnectionStatus::Created) {
-            bail!("Cannot init connection in invalid status: {:#?}", status);
-        }
+        self.status.ensure(ConnectionStatus::Created, |status| {
+            format!("Cannot init connection in invalid status: {:#?}", status)
+        })?;
 
         // Determine if authentication is required
         let requires_auth = self.namespace.config.auth_handler.is_some();
@@ -308,7 +310,6 @@ impl WsIoServerConnection {
     }
 
     // Public methods
-
     #[inline]
     pub fn cancel_token(&self) -> &CancellationToken {
         &self.cancel_token
@@ -343,6 +344,11 @@ impl WsIoServerConnection {
     #[inline]
     pub fn headers(&self) -> &HeaderMap {
         &self.headers
+    }
+
+    #[inline]
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     #[inline]
@@ -384,11 +390,6 @@ impl WsIoServerConnection {
     }
 
     #[inline]
-    pub fn sid(&self) -> &str {
-        &self.sid
-    }
-
-    #[inline]
     pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
         let cancel_token = self.cancel_token.clone();
         spawn(async move {
@@ -399,3 +400,6 @@ impl WsIoServerConnection {
         });
     }
 }
+
+// Constants/Statics
+static NEXT_CONNECTION_ID: LazyLock<AtomicU64> = LazyLock::new(|| AtomicU64::new(0));
