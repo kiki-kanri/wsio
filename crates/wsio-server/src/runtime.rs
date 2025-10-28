@@ -1,16 +1,13 @@
 use std::{
     collections::HashMap,
-    sync::{
-        Arc,
-        Weak,
-    },
+    sync::Arc,
 };
 
 use anyhow::{
     Result,
     bail,
 };
-use dashmap::DashMap;
+use dashmap::DashSet;
 use futures_util::future::join_all;
 use num_enum::{
     IntoPrimitive,
@@ -21,7 +18,6 @@ use serde::Serialize;
 
 use crate::{
     config::WsIoServerConfig,
-    connection::WsIoServerConnection,
     core::atomic::status::AtomicStatus,
     namespace::{
         WsIoServerNamespace,
@@ -41,7 +37,7 @@ pub(crate) enum WsIoServerRuntimeStatus {
 // Structs
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
-    connections: DashMap<u64, Weak<WsIoServerConnection>>,
+    connection_ids: DashSet<u64>,
     namespaces: RwLock<HashMap<String, Arc<WsIoServerNamespace>>>,
     pub(crate) status: AtomicStatus<WsIoServerRuntimeStatus>,
 }
@@ -50,7 +46,7 @@ impl WsIoServerRuntime {
     pub(crate) fn new(config: WsIoServerConfig) -> Arc<Self> {
         Arc::new(Self {
             config,
-            connections: DashMap::new(),
+            connection_ids: DashSet::new(),
             namespaces: RwLock::new(HashMap::new()),
             status: AtomicStatus::new(WsIoServerRuntimeStatus::Running),
         })
@@ -65,7 +61,7 @@ impl WsIoServerRuntime {
     // Protected methods
     #[inline]
     pub(crate) fn connection_count(&self) -> usize {
-        self.connections.len()
+        self.connection_ids.len()
     }
 
     pub(crate) async fn emit<D: Serialize>(&self, event: &str, data: Option<&D>) -> Result<()> {
@@ -89,8 +85,8 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn insert_connection(&self, connection: &Arc<WsIoServerConnection>) {
-        self.connections.insert(connection.id(), Arc::downgrade(connection));
+    pub(crate) fn insert_connection_id(&self, connection_id: u64) {
+        self.connection_ids.insert(connection_id);
     }
 
     #[inline]
@@ -118,8 +114,8 @@ impl WsIoServerRuntime {
     }
 
     #[inline]
-    pub(crate) fn remove_connection(&self, id: u64) {
-        self.connections.remove(&id);
+    pub(crate) fn remove_connection_id(&self, id: u64) {
+        self.connection_ids.remove(&id);
     }
 
     pub(crate) async fn remove_namespace(&self, path: &str) {
@@ -137,13 +133,7 @@ impl WsIoServerRuntime {
             _ => unreachable!(),
         }
 
-        join_all(
-            self.clone_namespaces()
-                .iter()
-                .map(|namespace| async move { namespace.shutdown().await }),
-        )
-        .await;
-
+        join_all(self.clone_namespaces().iter().map(|namespace| namespace.shutdown())).await;
         self.status.store(WsIoServerRuntimeStatus::Stopped);
     }
 }

@@ -231,6 +231,9 @@ impl WsIoServerConnection {
         // Set connection state to Closing
         self.status.store(ConnectionStatus::Closing);
 
+        // Remove connection from namespace
+        self.namespace.remove_connection(self.id);
+
         // Leave all joined rooms
         let joined_rooms = self.joined_rooms.iter().map(|entry| entry.clone()).collect::<Vec<_>>();
         for room_name in joined_rooms {
@@ -241,9 +244,6 @@ impl WsIoServerConnection {
 
         // Abort auth-timeout task if still active
         abort_locked_task(&self.auth_timeout_task).await;
-
-        // Remove connection from namespace
-        self.namespace.remove_connection(self.id);
 
         // Cancel all ongoing operations via cancel token
         self.cancel_token.load().cancel();

@@ -195,13 +195,13 @@ impl WsIoServerNamespace {
     #[inline]
     pub(crate) fn insert_connection(&self, connection: Arc<WsIoServerConnection>) {
         self.connections.insert(connection.id(), connection.clone());
-        self.runtime.insert_connection(&connection);
+        self.runtime.insert_connection_id(connection.id());
     }
 
     #[inline]
     pub(crate) fn remove_connection(&self, id: u64) {
         self.connections.remove(&id);
-        self.runtime.remove_connection(id);
+        self.runtime.remove_connection_id(id);
     }
 
     #[inline]
@@ -231,10 +231,11 @@ impl WsIoServerNamespace {
                 .transpose()?,
         ))?;
 
-        join_all(self.clone_connections().iter().map(|connection| {
-            let message = message.clone();
-            async move { connection.emit_message(message).await }
-        }))
+        join_all(
+            self.clone_connections()
+                .iter()
+                .map(|connection| connection.emit_message(message.clone())),
+        )
         .await;
 
         Ok(())
