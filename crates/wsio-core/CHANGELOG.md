@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.5.0...wsio-core-v0.6.0) - 2025-10-28
+
+### Added
+
+- implement spawn management in `WsIoEventRegistry`, update and clean up code
+
+### Fixed
+
+- *(core)* enable tokio macros feature
+
+### Other
+
+- *(core)* lint code
+- clean up, modify, and optimize code
+
 ## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.4.0...wsio-core-v0.5.0) - 2025-10-27 08:04
 
 ### 🏡 Chore

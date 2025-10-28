@@ -2137,7 +2137,7 @@ checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
 
 [[package]]
 name = "wsio-client"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2153,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "wsio-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2167,14 +2167,16 @@ dependencies = [
  "serde_with",
  "sonic-rs",
  "tokio",
+ "tokio-util",
  "tungstenite",
 ]
 
 [[package]]
 name = "wsio-server"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
+ "arc-swap",
  "dashmap",
  "futures-util",
  "http",

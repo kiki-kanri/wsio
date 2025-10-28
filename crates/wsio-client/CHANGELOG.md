@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.4.1...wsio-client-v0.5.0) - 2025-10-28
+
+### Added
+
+- implement spawn management in `WsIoEventRegistry`, update and clean up code
+
+### Other
+
+- clean up, modify, and optimize code
+
 ## [0.4.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.4.0...wsio-client-v0.4.1) - 2025-10-27 08:04
 
 ### 💅 Refactors

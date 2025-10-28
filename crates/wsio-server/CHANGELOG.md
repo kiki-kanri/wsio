@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.5.1...wsio-server-v0.6.0) - 2025-10-28
+
+### Added
+
+- implement spawn management in `WsIoEventRegistry`, update and clean up code
+- *(server)* public namespace
+
+### Other
+
+- *(server)* [**breaking**] update tower-related service architecture
+- clean up, modify, and optimize code
+
 ## [0.5.1](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.5.0...wsio-server-v0.5.1) - 2025-10-27 08:04
 
 ### 💅 Refactors
