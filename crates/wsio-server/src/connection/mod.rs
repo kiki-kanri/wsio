@@ -12,6 +12,7 @@ use anyhow::{
     bail,
 };
 use arc_swap::ArcSwap;
+use dashmap::DashSet;
 use http::HeaderMap;
 use num_enum::{
     IntoPrimitive,
@@ -84,6 +85,7 @@ pub struct WsIoServerConnection {
     extensions: ConnectionExtensions,
     headers: HeaderMap,
     id: u64,
+    joined_rooms: DashSet<String>,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
@@ -111,6 +113,7 @@ impl WsIoServerConnection {
                 extensions: ConnectionExtensions::new(),
                 headers,
                 id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
+                joined_rooms: DashSet::new(),
                 message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),
@@ -227,6 +230,14 @@ impl WsIoServerConnection {
     pub(crate) async fn cleanup(self: &Arc<Self>) {
         // Set connection state to Closing
         self.status.store(ConnectionStatus::Closing);
+
+        // Leave all joined rooms
+        let joined_rooms = self.joined_rooms.iter().map(|entry| entry.clone()).collect::<Vec<_>>();
+        for room_name in joined_rooms {
+            self.namespace.remove_connection_from_room(&room_name, self.id);
+        }
+
+        self.joined_rooms.clear();
 
         // Abort auth-timeout task if still active
         abort_locked_task(&self.auth_timeout_task).await;
@@ -357,6 +368,22 @@ impl WsIoServerConnection {
     #[inline]
     pub fn id(&self) -> u64 {
         self.id
+    }
+
+    #[inline]
+    pub fn join<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
+        for room_name in room_names {
+            self.namespace.add_connection_to_room(&room_name, self.clone());
+            self.joined_rooms.insert(room_name.as_ref().to_string());
+        }
+    }
+
+    #[inline]
+    pub fn leave<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
+        for room_name in room_names {
+            self.namespace.remove_connection_from_room(&room_name, self.id);
+            self.joined_rooms.remove(room_name.as_ref());
+        }
     }
 
     #[inline]

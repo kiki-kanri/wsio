@@ -64,6 +64,7 @@ pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
     connections: DashMap<u64, Arc<WsIoServerConnection>>,
     connection_task_set: Mutex<JoinSet<()>>,
+    rooms: DashMap<String, DashMap<u64, Arc<WsIoServerConnection>>>,
     runtime: Arc<WsIoServerRuntime>,
     status: AtomicStatus<NamespaceStatus>,
 }
@@ -74,6 +75,7 @@ impl WsIoServerNamespace {
             config,
             connections: DashMap::new(),
             connection_task_set: Mutex::new(JoinSet::new()),
+            rooms: DashMap::new(),
             runtime,
             status: AtomicStatus::new(NamespaceStatus::Running),
         })
@@ -165,6 +167,14 @@ impl WsIoServerNamespace {
 
     // Protected methods
     #[inline]
+    pub(crate) fn add_connection_to_room(&self, room_name: impl AsRef<str>, connection: Arc<WsIoServerConnection>) {
+        self.rooms
+            .entry(room_name.as_ref().to_string())
+            .or_default()
+            .insert(connection.id(), connection);
+    }
+
+    #[inline]
     pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
         let bytes = self.config.packet_codec.encode(packet)?;
         Ok(match self.config.packet_codec.is_text() {
@@ -192,6 +202,17 @@ impl WsIoServerNamespace {
     pub(crate) fn remove_connection(&self, id: u64) {
         self.connections.remove(&id);
         self.runtime.remove_connection(id);
+    }
+
+    #[inline]
+    pub(crate) fn remove_connection_from_room(&self, room_name: impl AsRef<str>, connection_id: u64) {
+        let room_name = room_name.as_ref();
+        if let Some(room) = self.rooms.get(room_name) {
+            room.remove(&connection_id);
+            if room.is_empty() {
+                self.rooms.remove(room_name);
+            }
+        }
     }
 
     // Public methods
