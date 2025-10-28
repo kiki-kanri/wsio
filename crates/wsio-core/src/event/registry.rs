@@ -50,6 +50,12 @@ pub struct WsIoEventRegistry<C: Send + Sync + 'static, S: TaskSpawner> {
     next_handler_id: AtomicU32,
 }
 
+impl<C: Send + Sync + 'static, S: TaskSpawner> Default for WsIoEventRegistry<C, S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     #[inline]
     pub fn new() -> Self {
