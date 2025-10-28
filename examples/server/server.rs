@@ -33,9 +33,9 @@ static WS_IO_SERVER: LazyLock<WsIoServer> = LazyLock::new(|| WsIoServer::builder
 // Functions
 async fn on_close(connection: Arc<WsIoServerConnection>) -> Result<()> {
     tracing::info!(
-        "{}: on_close, sid: {}, ns conns: {}, server conns: {}",
+        "{}: on_close, id: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
-        connection.sid(),
+        connection.id(),
         connection.namespace().connection_count(),
         connection.namespace().server().connection_count()
     );
@@ -45,9 +45,9 @@ async fn on_close(connection: Arc<WsIoServerConnection>) -> Result<()> {
 
 async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
     tracing::info!(
-        "{}: on_connect, sid: {}, ns conns: {}, server conns: {}",
+        "{}: on_connect, id: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
-        connection.sid(),
+        connection.id(),
         connection.namespace().connection_count(),
         connection.namespace().server().connection_count()
     );
@@ -58,9 +58,9 @@ async fn on_connect(connection: Arc<WsIoServerConnection>) -> Result<()> {
 
 async fn on_ready(connection: Arc<WsIoServerConnection>) -> Result<()> {
     tracing::info!(
-        "{}: on_ready, sid: {}, ns conns: {}, server conns: {}",
+        "{}: on_ready, id: {}, ns conns: {}, server conns: {}",
         connection.namespace().path(),
-        connection.sid(),
+        connection.id(),
         connection.namespace().connection_count(),
         connection.namespace().server().connection_count()
     );
