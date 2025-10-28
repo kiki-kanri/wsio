@@ -167,9 +167,9 @@ impl WsIoServerNamespace {
 
     // Protected methods
     #[inline]
-    pub(crate) fn add_connection_to_room(&self, room_name: impl AsRef<str>, connection: Arc<WsIoServerConnection>) {
+    pub(crate) fn add_connection_to_room(&self, room_name: &str, connection: Arc<WsIoServerConnection>) {
         self.rooms
-            .entry(room_name.as_ref().to_string())
+            .entry(room_name.to_string())
             .or_default()
             .insert(connection.id(), connection);
     }
@@ -205,8 +205,7 @@ impl WsIoServerNamespace {
     }
 
     #[inline]
-    pub(crate) fn remove_connection_from_room(&self, room_name: impl AsRef<str>, connection_id: u64) {
-        let room_name = room_name.as_ref();
+    pub(crate) fn remove_connection_from_room(&self, room_name: &str, connection_id: u64) {
         if let Some(room) = self.rooms.get(room_name) {
             room.remove(&connection_id);
             if room.is_empty() {
@@ -221,13 +220,13 @@ impl WsIoServerNamespace {
         self.connections.len()
     }
 
-    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
         self.status.ensure(NamespaceStatus::Running, |status| {
             format!("Cannot emit event in invalid status: {:#?}", status)
         })?;
 
         let message = self.encode_packet_to_message(&WsIoPacket::new_event(
-            event,
+            event.as_ref(),
             data.map(|data| self.config.packet_codec.encode_data(data))
                 .transpose()?,
         ))?;

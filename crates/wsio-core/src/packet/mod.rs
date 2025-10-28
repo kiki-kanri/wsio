@@ -37,8 +37,12 @@ pub struct WsIoPacket {
 
 impl WsIoPacket {
     #[inline]
-    pub fn new(r#type: WsIoPacketType, key: Option<String>, data: Option<Vec<u8>>) -> Self {
-        Self { data, key, r#type }
+    pub fn new(r#type: WsIoPacketType, key: Option<&str>, data: Option<Vec<u8>>) -> Self {
+        Self {
+            data,
+            key: key.map(|k| k.to_string()),
+            r#type,
+        }
     }
 
     // Public methods
@@ -48,8 +52,8 @@ impl WsIoPacket {
     }
 
     #[inline]
-    pub fn new_event(event: impl Into<String>, data: Option<Vec<u8>>) -> Self {
-        Self::new(WsIoPacketType::Event, Some(event.into()), data)
+    pub fn new_event(event: &str, data: Option<Vec<u8>>) -> Self {
+        Self::new(WsIoPacketType::Event, Some(event), data)
     }
 
     #[inline]

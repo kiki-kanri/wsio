@@ -68,16 +68,16 @@ impl WsIoServerRuntime {
         self.connections.len()
     }
 
-    pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+    pub(crate) async fn emit<D: Serialize>(&self, event: &str, data: Option<&D>) -> Result<()> {
         self.status.ensure(WsIoServerRuntimeStatus::Running, |status| {
             format!("Cannot emit event in invalid status: {:#?}", status)
         })?;
 
-        let event = Arc::new(event.into());
-        join_all(self.clone_namespaces().iter().map(|namespace| {
-            let event = event.clone();
-            async move { namespace.emit(&*event, data).await }
-        }))
+        join_all(
+            self.clone_namespaces()
+                .iter()
+                .map(|namespace| namespace.emit(event, data)),
+        )
         .await;
 
         Ok(())

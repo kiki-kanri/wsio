@@ -192,7 +192,7 @@ impl WsIoClientRuntime {
         self.status.store(RuntimeStatus::Stopped);
     }
 
-    pub(crate) async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+    pub(crate) async fn emit<D: Serialize>(&self, event: &str, data: Option<&D>) -> Result<()> {
         self.status.ensure(RuntimeStatus::Running, |status| {
             format!("Cannot emit event in invalid status: {:#?}", status)
         })?;
@@ -220,17 +220,17 @@ impl WsIoClientRuntime {
     }
 
     #[inline]
-    pub(crate) fn off(&self, event: impl AsRef<str>) {
+    pub(crate) fn off(&self, event: &str) {
         self.event_registry.off(event);
     }
 
     #[inline]
-    pub(crate) fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
+    pub(crate) fn off_by_handler_id(&self, event: &str, handler_id: u32) {
         self.event_registry.off_by_handler_id(event, handler_id);
     }
 
     #[inline]
-    pub(crate) fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
+    pub(crate) fn on<H, Fut, D>(&self, event: &str, handler: H) -> u32
     where
         H: Fn(Arc<WsIoClientConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,

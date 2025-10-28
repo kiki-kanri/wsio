@@ -339,10 +339,10 @@ impl WsIoServerConnection {
         self.close()
     }
 
-    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
+    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
         self.ensure_status_ready()?;
         self.send_packet(&WsIoPacket::new_event(
-            event,
+            event.as_ref(),
             data.map(|data| self.namespace.config.packet_codec.encode_data(data))
                 .transpose()?,
         ))
@@ -373,15 +373,16 @@ impl WsIoServerConnection {
     #[inline]
     pub fn join<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
         for room_name in room_names {
-            self.namespace.add_connection_to_room(&room_name, self.clone());
-            self.joined_rooms.insert(room_name.as_ref().to_string());
+            let room_name = room_name.as_ref();
+            self.namespace.add_connection_to_room(room_name, self.clone());
+            self.joined_rooms.insert(room_name.to_string());
         }
     }
 
     #[inline]
     pub fn leave<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
         for room_name in room_names {
-            self.namespace.remove_connection_from_room(&room_name, self.id);
+            self.namespace.remove_connection_from_room(room_name.as_ref(), self.id);
             self.joined_rooms.remove(room_name.as_ref());
         }
     }
@@ -393,22 +394,22 @@ impl WsIoServerConnection {
 
     #[inline]
     pub fn off(&self, event: impl AsRef<str>) {
-        self.event_registry.off(event);
+        self.event_registry.off(event.as_ref());
     }
 
     #[inline]
     pub fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
-        self.event_registry.off_by_handler_id(event, handler_id);
+        self.event_registry.off_by_handler_id(event.as_ref(), handler_id);
     }
 
     #[inline]
-    pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
+    pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> u32
     where
         H: Fn(Arc<WsIoServerConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {
-        self.event_registry.on(event, handler)
+        self.event_registry.on(event.as_ref(), handler)
     }
 
     pub async fn on_close<H, Fut>(&self, handler: H)

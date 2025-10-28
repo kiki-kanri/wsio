@@ -71,12 +71,12 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     pub fn dispatch_event_packet(
         &self,
         ctx: Arc<C>,
-        event: impl AsRef<str>,
+        event: &str,
         packet_codec: &WsIoPacketCodec,
         packet_data: Option<Vec<u8>>,
         task_spawner: &Arc<S>,
     ) {
-        let Some(event_entry) = self.event_entries.read().get(event.as_ref()).cloned() else {
+        let Some(event_entry) = self.event_entries.read().get(event).cloned() else {
             return;
         };
 
@@ -103,13 +103,12 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     }
 
     #[inline]
-    pub fn off(&self, event: impl AsRef<str>) {
-        self.event_entries.write().remove(event.as_ref());
+    pub fn off(&self, event: &str) {
+        self.event_entries.write().remove(event);
     }
 
     #[inline]
-    pub fn off_by_handler_id(&self, event: impl AsRef<str>, handler_id: u32) {
-        let event = event.as_ref();
+    pub fn off_by_handler_id(&self, event: &str, handler_id: u32) {
         let mut event_entries = self.event_entries.write();
         let remove_event = if let Some(event_entry) = event_entries.get_mut(event) {
             let mut handlers = event_entry.handlers.write();
@@ -125,17 +124,16 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     }
 
     #[inline]
-    pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
+    pub fn on<H, Fut, D>(&self, event: &str, handler: H) -> u32
     where
         H: Fn(Arc<C>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {
         let data_type_id = TypeId::of::<D>();
-        let event = event.into();
 
         let mut event_entries = self.event_entries.write();
-        let event_entry = match event_entries.entry(event.clone()) {
+        let event_entry = match event_entries.entry(event.to_string()) {
             Entry::Occupied(occupied) => {
                 let event_entry = occupied.into_mut();
                 assert_eq!(

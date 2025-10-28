@@ -38,8 +38,8 @@ impl WsIoServer {
         self.0.connection_count()
     }
 
-    pub async fn emit<D: Serialize>(&self, event: impl Into<String>, data: Option<&D>) -> Result<()> {
-        self.0.emit(event, data).await
+    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
+        self.0.emit(event.as_ref(), data).await
     }
 
     #[cfg(feature = "tower")]
