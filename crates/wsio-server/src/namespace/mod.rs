@@ -80,6 +80,11 @@ impl WsIoServerNamespace {
     }
 
     // Private methods
+    #[inline]
+    fn clone_connections(&self) -> Vec<Arc<WsIoServerConnection>> {
+        self.connections.iter().map(|entry| entry.value().clone()).collect()
+    }
+
     async fn handle_upgraded_request(self: &Arc<Self>, headers: HeaderMap, upgraded: Upgraded) -> Result<()> {
         // Create ws stream
         let mut ws_stream =
@@ -206,8 +211,7 @@ impl WsIoServerNamespace {
                 .transpose()?,
         ))?;
 
-        join_all(self.connections.iter().map(|entry| {
-            let connection = entry.value().clone();
+        join_all(self.clone_connections().iter().map(|connection| {
             let message = message.clone();
             async move { connection.emit_message(message).await }
         }))
@@ -233,10 +237,11 @@ impl WsIoServerNamespace {
             _ => unreachable!(),
         }
 
-        join_all(self.connections.iter().map(|entry| {
-            let connection = entry.value().clone();
-            async move { connection.disconnect().await }
-        }))
+        join_all(
+            self.clone_connections()
+                .iter()
+                .map(|connection| connection.disconnect()),
+        )
         .await;
 
         let mut connection_task_set = self.connection_task_set.lock().await;

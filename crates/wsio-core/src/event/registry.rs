@@ -91,10 +91,10 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
                 None => EMPTY_EVENT_DATA_ANY_ARC.clone(),
             };
 
-            for handler in event_entry.handlers.read().values() {
+            let handlers = event_entry.handlers.read().values().cloned().collect::<Vec<_>>();
+            for handler in handlers {
                 let ctx = ctx.clone();
                 let data = data.clone();
-                let handler = handler.clone();
                 task_spawner_clone.spawn_task(handler(ctx, data));
             }
 
