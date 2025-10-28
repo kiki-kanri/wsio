@@ -8,6 +8,7 @@ use serde::{
     Serialize,
     de::DeserializeOwned,
 };
+use tokio_util::sync::CancellationToken;
 use url::Url;
 pub use wsio_core as core;
 
@@ -19,6 +20,7 @@ mod runtime;
 use crate::{
     builder::WsIoClientBuilder,
     connection::WsIoClientConnection,
+    core::traits::task::spawner::TaskSpawner,
     runtime::WsIoClientRuntime,
 };
 
@@ -39,6 +41,10 @@ impl WsIoClient {
         };
 
         WsIoClientBuilder::new(url)
+    }
+
+    pub fn cancel_token(&self) -> Arc<CancellationToken> {
+        self.0.cancel_token()
     }
 
     pub async fn connect(&self) {
@@ -71,5 +77,10 @@ impl WsIoClient {
         D: DeserializeOwned + Send + Sync + 'static,
     {
         self.0.on(event, handler)
+    }
+
+    #[inline]
+    pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
+        self.0.spawn_task(future);
     }
 }

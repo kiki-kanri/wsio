@@ -4,12 +4,12 @@ use anyhow::{
     Result,
     bail,
 };
+use arc_swap::ArcSwap;
 use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
 };
 use tokio::{
-    select,
     spawn,
     sync::{
         Mutex,
@@ -29,6 +29,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    WsIoClient,
     core::{
         atomic::status::AtomicStatus,
         channel_capacity_from_websocket_config,
@@ -36,6 +37,7 @@ use crate::{
             WsIoPacket,
             WsIoPacketType,
         },
+        traits::task::spawner::TaskSpawner,
         utils::task::abort_locked_task,
     },
     runtime::WsIoClientRuntime,
@@ -57,12 +59,19 @@ enum ConnectionStatus {
 
 // Structs
 pub struct WsIoClientConnection {
-    cancel_token: CancellationToken,
+    cancel_token: ArcSwap<CancellationToken>,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
     message_tx: Sender<Message>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
     status: AtomicStatus<ConnectionStatus>,
+}
+
+impl TaskSpawner for WsIoClientConnection {
+    #[inline]
+    fn cancel_token(&self) -> Arc<CancellationToken> {
+        self.cancel_token.load_full()
+    }
 }
 
 impl WsIoClientConnection {
@@ -72,7 +81,7 @@ impl WsIoClientConnection {
         let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
-                cancel_token: CancellationToken::new(),
+                cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
                 init_timeout_task: Mutex::new(None),
                 message_tx,
                 ready_timeout_task: Mutex::new(None),
@@ -93,9 +102,13 @@ impl WsIoClientConnection {
 
     #[inline]
     fn handle_event_packet(self: &Arc<Self>, event: &str, packet_data: Option<Vec<u8>>) -> Result<()> {
-        self.runtime
-            .event_registry
-            .dispatch_event_packet(self.clone(), event, packet_data);
+        self.runtime.event_registry.dispatch_event_packet(
+            self.clone(),
+            event,
+            &self.runtime.config.packet_codec,
+            packet_data,
+            &self.runtime,
+        );
 
         Ok(())
     }
@@ -191,7 +204,7 @@ impl WsIoClientConnection {
         abort_locked_task(&self.ready_timeout_task).await;
 
         // Cancel all ongoing operations via cancel token
-        self.cancel_token.cancel();
+        self.cancel_token.load().cancel();
 
         // Invoke on_connection_close handler with timeout protection if configured
         if let Some(on_connection_close_handler) = &self.runtime.config.on_connection_close_handler {
@@ -262,19 +275,7 @@ impl WsIoClientConnection {
     }
 
     // Public methods
-    #[inline]
-    pub fn cancel_token(&self) -> &CancellationToken {
-        &self.cancel_token
-    }
-
-    #[inline]
-    pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
-        let cancel_token = self.cancel_token.clone();
-        spawn(async move {
-            select! {
-                _ = cancel_token.cancelled() => {},
-                _ = future => {},
-            }
-        });
+    pub fn client(&self) -> WsIoClient {
+        WsIoClient(self.runtime.clone())
     }
 }

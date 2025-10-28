@@ -11,6 +11,7 @@ use anyhow::{
     Result,
     bail,
 };
+use arc_swap::ArcSwap;
 use http::HeaderMap;
 use num_enum::{
     IntoPrimitive,
@@ -21,7 +22,6 @@ use serde::{
     de::DeserializeOwned,
 };
 use tokio::{
-    select,
     spawn,
     sync::{
         Mutex,
@@ -55,6 +55,7 @@ use crate::{
             WsIoPacket,
             WsIoPacketType,
         },
+        traits::task::spawner::TaskSpawner,
         types::BoxAsyncUnaryResultHandler,
         utils::task::abort_locked_task,
     },
@@ -77,8 +78,8 @@ enum ConnectionStatus {
 // Structs
 pub struct WsIoServerConnection {
     auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
-    cancel_token: CancellationToken,
-    event_registry: WsIoEventRegistry<WsIoServerConnection>,
+    cancel_token: ArcSwap<CancellationToken>,
+    event_registry: WsIoEventRegistry<WsIoServerConnection, WsIoServerConnection>,
     #[cfg(feature = "connection-extensions")]
     extensions: ConnectionExtensions,
     headers: HeaderMap,
@@ -89,6 +90,13 @@ pub struct WsIoServerConnection {
     status: AtomicStatus<ConnectionStatus>,
 }
 
+impl TaskSpawner for WsIoServerConnection {
+    #[inline]
+    fn cancel_token(&self) -> Arc<CancellationToken> {
+        self.cancel_token.load_full()
+    }
+}
+
 impl WsIoServerConnection {
     #[inline]
     pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Arc<Self>, Receiver<Message>) {
@@ -97,8 +105,8 @@ impl WsIoServerConnection {
         (
             Arc::new(Self {
                 auth_timeout_task: Mutex::new(None),
-                cancel_token: CancellationToken::new(),
-                event_registry: WsIoEventRegistry::new(namespace.config.packet_codec),
+                cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
+                event_registry: WsIoEventRegistry::new(),
                 #[cfg(feature = "connection-extensions")]
                 extensions: ConnectionExtensions::new(),
                 headers,
@@ -197,8 +205,13 @@ impl WsIoServerConnection {
 
     #[inline]
     fn handle_event_packet(self: &Arc<Self>, event: &str, packet_data: Option<Vec<u8>>) -> Result<()> {
-        self.event_registry
-            .dispatch_event_packet(self.clone(), event, packet_data);
+        self.event_registry.dispatch_event_packet(
+            self.clone(),
+            event,
+            &self.namespace.config.packet_codec,
+            packet_data,
+            self,
+        );
 
         Ok(())
     }
@@ -222,7 +235,7 @@ impl WsIoServerConnection {
         self.namespace.remove_connection(self.id);
 
         // Cancel all ongoing operations via cancel token
-        self.cancel_token.cancel();
+        self.cancel_token.load().cancel();
 
         // Invoke on_close handler with timeout protection if configured
         if let Some(on_close_handler) = self.on_close_handler.lock().await.take() {
@@ -310,11 +323,6 @@ impl WsIoServerConnection {
     }
 
     // Public methods
-    #[inline]
-    pub fn cancel_token(&self) -> &CancellationToken {
-        &self.cancel_token
-    }
-
     pub async fn disconnect(&self) {
         let _ = self.send_packet(&WsIoPacket::new_disconnect()).await;
         self.close()
@@ -387,17 +395,6 @@ impl WsIoServerConnection {
     #[inline]
     pub fn server(&self) -> WsIoServer {
         self.namespace.server()
-    }
-
-    #[inline]
-    pub fn spawn_task<F: Future<Output = Result<()>> + Send + 'static>(&self, future: F) {
-        let cancel_token = self.cancel_token.clone();
-        spawn(async move {
-            select! {
-                _ = cancel_token.cancelled() => {},
-                _ = future => {},
-            }
-        });
     }
 }
 

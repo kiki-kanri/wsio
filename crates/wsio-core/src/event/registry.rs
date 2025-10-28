@@ -7,6 +7,7 @@ use std::{
         HashMap,
         hash_map::Entry,
     },
+    marker::PhantomData,
     pin::Pin,
     sync::{
         Arc,
@@ -21,68 +22,77 @@ use std::{
 use anyhow::Result;
 use parking_lot::RwLock;
 use serde::de::DeserializeOwned;
-use tokio::spawn;
 
-use crate::packet::codecs::WsIoPacketCodec;
+use crate::{
+    packet::codecs::WsIoPacketCodec,
+    traits::task::spawner::TaskSpawner,
+};
 
 // Types
 type DataDecoder = fn(&[u8], &WsIoPacketCodec) -> Result<Arc<dyn Any + Send + Sync>>;
-type Handler<T> = Arc<
-    dyn Fn(Arc<T>, Arc<dyn Any + Send + Sync>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
+type Handler<C> = Arc<
+    dyn Fn(Arc<C>, Arc<dyn Any + Send + Sync>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
         + Send
         + Sync
         + 'static,
 >;
 
 // Structs
-struct EventEntry<T> {
+struct EventEntry<C> {
     data_decoder: DataDecoder,
     data_type_id: TypeId,
-    handlers: RwLock<HashMap<u32, Handler<T>>>,
+    handlers: RwLock<HashMap<u32, Handler<C>>>,
 }
 
-pub struct WsIoEventRegistry<T: Send + Sync + 'static> {
-    event_entries: RwLock<HashMap<String, Arc<EventEntry<T>>>>,
+pub struct WsIoEventRegistry<C: Send + Sync + 'static, S: TaskSpawner> {
+    _task_spawner: PhantomData<S>,
+    event_entries: RwLock<HashMap<String, Arc<EventEntry<C>>>>,
     next_handler_id: AtomicU32,
-    packet_codec: WsIoPacketCodec,
 }
 
-impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
+impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     #[inline]
-    pub fn new(packet_codec: WsIoPacketCodec) -> Self {
+    pub fn new() -> Self {
         Self {
+            _task_spawner: PhantomData,
             event_entries: RwLock::new(HashMap::new()),
             next_handler_id: AtomicU32::new(0),
-            packet_codec,
         }
     }
 
     // Public methods
     #[inline]
-    pub fn dispatch_event_packet(&self, t: Arc<T>, event: impl AsRef<str>, packet_data: Option<Vec<u8>>) {
+    pub fn dispatch_event_packet(
+        &self,
+        ctx: Arc<C>,
+        event: impl AsRef<str>,
+        packet_codec: &WsIoPacketCodec,
+        packet_data: Option<Vec<u8>>,
+        task_spawner: &Arc<S>,
+    ) {
         let Some(event_entry) = self.event_entries.read().get(event.as_ref()).cloned() else {
             return;
         };
 
-        let packet_codec = self.packet_codec;
-        // TODO: task manager
-        spawn(async move {
+        let packet_codec = *packet_codec;
+        let task_spawner_clone = task_spawner.clone();
+        task_spawner.spawn_task(async move {
             let data = match packet_data {
                 Some(bytes) => match (event_entry.data_decoder)(&bytes, &packet_codec) {
                     Ok(data) => data,
-                    Err(_) => return,
+                    Err(_) => return Ok(()),
                 },
                 None => EMPTY_EVENT_DATA_ANY_ARC.clone(),
             };
 
             for handler in event_entry.handlers.read().values() {
+                let ctx = ctx.clone();
                 let data = data.clone();
                 let handler = handler.clone();
-                let t = t.clone();
-                spawn(async move {
-                    let _ = handler(t, data).await;
-                });
+                task_spawner_clone.spawn_task(handler(ctx, data));
             }
+
+            Ok(())
         });
     }
 
@@ -111,7 +121,7 @@ impl<T: Send + Sync + 'static> WsIoEventRegistry<T> {
     #[inline]
     pub fn on<H, Fut, D>(&self, event: impl Into<String>, handler: H) -> u32
     where
-        H: Fn(Arc<T>, Arc<D>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<C>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {

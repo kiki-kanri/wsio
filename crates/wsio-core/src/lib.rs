@@ -3,6 +3,7 @@ use tungstenite::protocol::WebSocketConfig;
 pub mod atomic;
 pub mod event;
 pub mod packet;
+pub mod traits;
 pub mod types;
 pub mod utils;
 

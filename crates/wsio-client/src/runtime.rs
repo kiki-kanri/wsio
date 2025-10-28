@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use arc_swap::ArcSwapOption;
+use arc_swap::{
+    ArcSwap,
+    ArcSwapOption,
+};
 use futures_util::{
     SinkExt,
     StreamExt,
@@ -33,6 +36,7 @@ use tokio_tungstenite::{
     connect_async_with_config,
     tungstenite::Message,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     config::WsIoClientConfig,
@@ -42,6 +46,7 @@ use crate::{
         channel_capacity_from_websocket_config,
         event::registry::WsIoEventRegistry,
         packet::WsIoPacket,
+        traits::task::spawner::TaskSpawner,
     },
 };
 
@@ -56,6 +61,7 @@ enum RuntimeStatus {
 
 // Structs
 pub(crate) struct WsIoClientRuntime {
+    cancel_token: ArcSwap<CancellationToken>,
     pub(crate) config: WsIoClientConfig,
     connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
@@ -63,10 +69,17 @@ pub(crate) struct WsIoClientRuntime {
     event_message_flush_task: Mutex<Option<JoinHandle<()>>>,
     event_message_send_rx: Mutex<Receiver<Message>>,
     event_message_send_tx: Sender<Message>,
-    pub(crate) event_registry: WsIoEventRegistry<WsIoClientConnection>,
+    pub(crate) event_registry: WsIoEventRegistry<WsIoClientConnection, WsIoClientRuntime>,
     operate_lock: Mutex<()>,
     status: AtomicStatus<RuntimeStatus>,
     wake_reconnect_wait_notify: Notify,
+}
+
+impl TaskSpawner for WsIoClientRuntime {
+    #[inline]
+    fn cancel_token(&self) -> Arc<CancellationToken> {
+        self.cancel_token.load_full()
+    }
 }
 
 impl WsIoClientRuntime {
@@ -74,17 +87,18 @@ impl WsIoClientRuntime {
         let channel_capacity = channel_capacity_from_websocket_config(&config.websocket_config);
         let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
         Arc::new(Self {
+            cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
+            config,
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             event_message_flush_notify: Notify::new(),
             event_message_flush_task: Mutex::new(None),
             event_message_send_rx: Mutex::new(event_message_send_rx),
             event_message_send_tx,
-            event_registry: WsIoEventRegistry::new(config.packet_codec),
+            event_registry: WsIoEventRegistry::new(),
             operate_lock: Mutex::new(()),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
             wake_reconnect_wait_notify: Notify::new(),
-            config,
         })
     }
 
@@ -148,6 +162,10 @@ impl WsIoClientRuntime {
             RuntimeStatus::Running => self.status.store(RuntimeStatus::Stopping),
             _ => unreachable!(),
         }
+
+        // Cancel all ongoing operations via cancel token and store a new one
+        self.cancel_token.load().cancel();
+        self.cancel_token.store(Arc::new(CancellationToken::new()));
 
         // Abort event-message-flush task if still active
         if let Some(event_message_flush_task) = self.event_message_flush_task.lock().await.take() {
