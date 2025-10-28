@@ -2,10 +2,8 @@ use std::sync::Arc;
 
 use tower_layer::Layer;
 
-use crate::{
-    runtime::WsIoServerRuntime,
-    service::WsIoServerService,
-};
+use super::service::WsIoServerService;
+use crate::runtime::WsIoServerRuntime;
 
 // Structs
 #[derive(Clone)]

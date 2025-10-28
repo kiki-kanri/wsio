@@ -7,14 +7,15 @@ pub use wsio_core as core;
 mod builder;
 mod config;
 pub mod connection;
-mod layer;
 pub mod namespace;
+mod request;
+mod request_adapters;
 mod runtime;
-mod service;
 
+#[cfg(feature = "tower")]
+use crate::request_adapters::tower::layer::WsIoServerLayer;
 use crate::{
     builder::WsIoServerBuilder,
-    layer::WsIoServerLayer,
     namespace::{
         WsIoServerNamespace,
         builder::WsIoServerNamespaceBuilder,
@@ -41,6 +42,7 @@ impl WsIoServer {
         self.0.emit(event, data).await
     }
 
+    #[cfg(feature = "tower")]
     pub fn layer(&self) -> WsIoServerLayer {
         WsIoServerLayer::new(self.0.clone())
     }

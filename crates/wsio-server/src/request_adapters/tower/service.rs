@@ -16,10 +16,10 @@ use http::{
 use http_body::Body;
 use tower_service::Service as TowerService;
 
-mod request;
-
-use self::request::dispatch_request;
-use crate::runtime::WsIoServerRuntime;
+use crate::{
+    request::dispatch_request,
+    runtime::WsIoServerRuntime,
+};
 
 // Structs
 #[derive(Clone)]
@@ -50,7 +50,7 @@ where
 
     #[inline(always)]
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        if request.uri().path().starts_with(&self.runtime.config.request_path) {
+        if request.uri().path() == self.runtime.config.request_path {
             let runtime = self.runtime.clone();
             Box::pin(async move { dispatch_request(request, runtime).await })
         } else {
