@@ -22,9 +22,19 @@ pub enum WsIoPacketType {
 }
 
 // Structs
+#[cfg(any(
+    feature = "packet-codec-bincode",
+    feature = "packet-codec-msgpack",
+    feature = "packet-codec-postcard"
+))]
 #[derive(Deserialize)]
 struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 
+#[cfg(any(
+    feature = "packet-codec-bincode",
+    feature = "packet-codec-msgpack",
+    feature = "packet-codec-postcard"
+))]
 #[derive(Serialize)]
 struct InnerPacketRef<'a>(&'a Option<Vec<u8>>, &'a Option<String>, &'a WsIoPacketType);
 
