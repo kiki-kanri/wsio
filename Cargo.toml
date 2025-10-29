@@ -18,13 +18,9 @@ description = "A lightweight, async WebSocket framework inspired by Socket.IO â€
 edition = "2024"
 homepage = "https://github.com/ws-io/ws.io-rs"
 keywords = [
-  "async",
-  "client",
   "messaging",
   "network",
   "realtime",
-  "server",
-  "socket.io",
   "websocket",
   "ws",
 ]
