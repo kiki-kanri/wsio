@@ -22,6 +22,12 @@ pub enum WsIoPacketType {
 }
 
 // Structs
+#[derive(Deserialize)]
+struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
+
+#[derive(Serialize)]
+struct InnerPacketRef<'a>(&'a Option<Vec<u8>>, &'a Option<String>, &'a WsIoPacketType);
+
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WsIoPacket {

@@ -104,16 +104,16 @@ impl WsIoPacketCodec {
     pub fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
         match self {
             #[cfg(feature = "packet-codec-bincode")]
-            Self::Bincode => WsIoPacketBincodeCodec.encode(packet.clone()),
+            Self::Bincode => WsIoPacketBincodeCodec.encode(packet),
 
             #[cfg(feature = "packet-codec-cbor")]
             Self::Cbor => WsIoPacketCborCodec.encode(packet),
 
             #[cfg(feature = "packet-codec-msgpack")]
-            Self::MsgPack => WsIoPacketMsgPackCodec.encode(packet.clone()),
+            Self::MsgPack => WsIoPacketMsgPackCodec.encode(packet),
 
             #[cfg(feature = "packet-codec-postcard")]
-            Self::Postcard => WsIoPacketPostcardCodec.encode(packet.clone()),
+            Self::Postcard => WsIoPacketPostcardCodec.encode(packet),
 
             Self::SerdeJson => WsIoPacketSerdeJsonCodec.encode(packet),
 

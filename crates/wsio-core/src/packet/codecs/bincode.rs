@@ -7,19 +7,17 @@ use ::bincode::{
 };
 use anyhow::Result;
 use serde::{
-    Deserialize,
     Serialize,
     de::DeserializeOwned,
 };
 
 use super::super::{
+    InnerPacket,
+    InnerPacketRef,
     WsIoPacket,
-    WsIoPacketType,
 };
 
 // Structs
-#[derive(Deserialize, Serialize)]
-struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketBincodeCodec;
 
 impl WsIoPacketBincodeCodec {
@@ -42,9 +40,11 @@ impl WsIoPacketBincodeCodec {
     }
 
     #[inline]
-    pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
-        let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);
-        Ok(encode_to_vec(inner_packet, standard())?)
+    pub(super) fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
+        Ok(encode_to_vec(
+            &InnerPacketRef(&packet.data, &packet.key, &packet.r#type),
+            standard(),
+        )?)
     }
 
     #[inline]

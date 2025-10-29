@@ -4,19 +4,17 @@ use rmp_serde::{
     to_vec,
 };
 use serde::{
-    Deserialize,
     Serialize,
     de::DeserializeOwned,
 };
 
 use super::super::{
+    InnerPacket,
+    InnerPacketRef,
     WsIoPacket,
-    WsIoPacketType,
 };
 
 // Structs
-#[derive(Deserialize, Serialize)]
-struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketMsgPackCodec;
 
 impl WsIoPacketMsgPackCodec {
@@ -38,9 +36,8 @@ impl WsIoPacketMsgPackCodec {
     }
 
     #[inline]
-    pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
-        let inner_packet = InnerPacket(packet.data, packet.key, packet.r#type);
-        Ok(to_vec(&inner_packet)?)
+    pub(super) fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
+        Ok(to_vec(&InnerPacketRef(&packet.data, &packet.key, &packet.r#type))?)
     }
 
     #[inline]

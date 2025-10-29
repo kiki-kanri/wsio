@@ -4,19 +4,17 @@ use postcard::{
     to_allocvec,
 };
 use serde::{
-    Deserialize,
     Serialize,
     de::DeserializeOwned,
 };
 
 use super::super::{
+    InnerPacket,
+    InnerPacketRef,
     WsIoPacket,
-    WsIoPacketType,
 };
 
 // Structs
-#[derive(Deserialize, Serialize)]
-struct InnerPacket(Option<Vec<u8>>, Option<String>, WsIoPacketType);
 pub(super) struct WsIoPacketPostcardCodec;
 
 impl WsIoPacketPostcardCodec {
@@ -38,8 +36,8 @@ impl WsIoPacketPostcardCodec {
     }
 
     #[inline]
-    pub(super) fn encode(&self, packet: WsIoPacket) -> Result<Vec<u8>> {
-        Ok(to_allocvec(&InnerPacket(packet.data, packet.key, packet.r#type))?)
+    pub(super) fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
+        Ok(to_allocvec(&InnerPacketRef(&packet.data, &packet.key, &packet.r#type))?)
     }
 
     #[inline]
