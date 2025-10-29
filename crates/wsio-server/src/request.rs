@@ -52,11 +52,11 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     };
 
     // Get namespace path
-    let Some(namespace_path) = request.uri().query().and_then(|q| {
-        form_urlencoded::parse(q.as_bytes())
-            .find(|(k, _)| k == "namespace")
-            .map(|(_, v)| v.into_owned())
-    }) else {
+    let Some((_, namespace_path)) = request
+        .uri()
+        .query()
+        .and_then(|q| form_urlencoded::parse(q.as_bytes()).find(|(k, _)| k == "namespace"))
+    else {
         return respond(StatusCode::BAD_REQUEST);
     };
 
