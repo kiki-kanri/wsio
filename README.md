@@ -8,7 +8,13 @@ Partial principles and code reference: [socketoxide](https://github.com/Totodore
 
 Currently confirmed support for Axum; other HTTP servers based on Tower have not yet been tested.
 
-Since development is not yet complete, documentation is currently unavailable. However, you may refer to the results from [Zread](https://zread.ai/ws-io/ws.io-rs). Please note that Zread results may not be accurate.
+Since development is not yet complete, documentation is currently unavailable. However, you may refer to the results from [Zread](https://zread.ai/ws-io/ws.io-rs) or [DeepWiki](https://deepwiki.com/ws-io/ws.io-rs).
+
+Please note that Zread and DeepWiki results may not be accurate.
+
+The core functionality is now complete. I will proceed with developing the TS client and simultaneously integrate it into my own application.
+
+The next features will be implemented only after my TS client development, integration, and testing are complete, unless immediate fixes are required.
 
 ## Completed
 

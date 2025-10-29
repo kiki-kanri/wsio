@@ -17,6 +17,9 @@ pub(crate) struct WsIoServerConfig {
     /// Can be overridden by namespace-level configuration.
     pub(crate) auth_packet_timeout: Duration,
 
+    /// Maximum number of concurrent broadcast operations.
+    ///
+    /// Can be overridden by namespace-level configuration.
     pub(crate) broadcast_concurrency_limit: usize,
 
     /// Maximum duration allowed for middleware execution.
