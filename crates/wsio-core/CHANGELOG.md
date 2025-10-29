@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.1](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.6.0...wsio-core-v0.6.1) - 2025-10-29 06:31
+
+### 🏡 Chore
+
+- update packet meta ([8ada5df](https://github.com/ws-io/ws.io-rs/commit/8ada5df))
+
+### 💅 Refactors
+
+- *(core)* update all codec `encode` methods to support packet references, separating handling of `InnerPacketRef` and `InnerPacket` ([a870635](https://github.com/ws-io/ws.io-rs/commit/a870635))
+- replace all maps and sets with versions using `rustc_hash::FxBuildHasher` ([14cd911](https://github.com/ws-io/ws.io-rs/commit/14cd911))
+- replace all `impl Into<String>` with `impl AsRef<str>` and update internal string-related function parameters to `&str` ([7452d7b](https://github.com/ws-io/ws.io-rs/commit/7452d7b))
+
+### 🚀 Enhancements
+
+- implement server namespace broadcast functionality, refactor and clean up code ([7619362](https://github.com/ws-io/ws.io-rs/commit/7619362))
+
+### 🩹 Fixes
+
+- *(core)* resolve warning caused by `InnerPacket` not being gated by feature flag ([2a412e9](https://github.com/ws-io/ws.io-rs/commit/2a412e9))
+- avoid potential deadlocks by collecting map values into `Vec` before iterating and executing operations ([4913a78](https://github.com/ws-io/ws.io-rs/commit/4913a78))
+
 ## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.5.0...wsio-core-v0.6.0) - 2025-10-28
 
 ### Added

@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.6.0...wsio-server-v0.7.0) - 2025-10-29 06:31
+
+### 🏡 Chore
+
+- update packet meta ([8ada5df](https://github.com/ws-io/ws.io-rs/commit/8ada5df))
+
+### 💅 Refactors
+
+- *(server)* use reference instead of converting to `String` when retrieving namespace path in `dispatch_request` ([60e9860](https://github.com/ws-io/ws.io-rs/commit/60e9860))
+- replace all maps and sets with versions using `rustc_hash::FxBuildHasher` ([14cd911](https://github.com/ws-io/ws.io-rs/commit/14cd911))
+- *(server)* clean up code ([eb5d465](https://github.com/ws-io/ws.io-rs/commit/eb5d465))
+- replace all `impl Into<String>` with `impl AsRef<str>` and update internal string-related function parameters to `&str` ([7452d7b](https://github.com/ws-io/ws.io-rs/commit/7452d7b))
+
+### 🚀 Enhancements
+
+- implement server namespace broadcast functionality, refactor and clean up code ([7619362](https://github.com/ws-io/ws.io-rs/commit/7619362))
+- *(server)* add initial room join/leave functionality and auto-leave all rooms on disconnect ([a6f3acf](https://github.com/ws-io/ws.io-rs/commit/a6f3acf))
+
+### 🩹 Fixes
+
+- avoid potential deadlocks by collecting map values into `Vec` before iterating and executing operations ([4913a78](https://github.com/ws-io/ws.io-rs/commit/4913a78))
+
 ## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.5.1...wsio-server-v0.6.0) - 2025-10-28
 
 ### Added

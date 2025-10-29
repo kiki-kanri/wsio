@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.5.0...wsio-client-v0.5.1) - 2025-10-29 06:31
+
+### 🏡 Chore
+
+- update packet meta ([8ada5df](https://github.com/ws-io/ws.io-rs/commit/8ada5df))
+
+### 💅 Refactors
+
+- replace all `impl Into<String>` with `impl AsRef<str>` and update internal string-related function parameters to `&str` ([7452d7b](https://github.com/ws-io/ws.io-rs/commit/7452d7b))
+
+### 🚀 Enhancements
+
+- implement server namespace broadcast functionality, refactor and clean up code ([7619362](https://github.com/ws-io/ws.io-rs/commit/7619362))
+
 ## [0.5.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.4.1...wsio-client-v0.5.0) - 2025-10-28
 
 ### Added
