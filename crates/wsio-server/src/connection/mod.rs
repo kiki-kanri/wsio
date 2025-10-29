@@ -88,7 +88,7 @@ pub struct WsIoServerConnection {
     headers: HeaderMap,
     id: u64,
     joined_rooms: FxDashSet<String>,
-    message_tx: Sender<Message>,
+    message_tx: Sender<Arc<Message>>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
     status: AtomicStatus<ConnectionStatus>,
@@ -103,7 +103,7 @@ impl TaskSpawner for WsIoServerConnection {
 
 impl WsIoServerConnection {
     #[inline]
-    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Arc<Self>, Receiver<Message>) {
+    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Arc<Self>, Receiver<Arc<Message>>) {
         let channel_capacity = channel_capacity_from_websocket_config(&namespace.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
@@ -143,6 +143,11 @@ impl WsIoServerConnection {
                 middleware(self.clone()),
             )
             .await??;
+
+            // Ensure connection is still in Activating state
+            self.status.ensure(ConnectionStatus::Activating, |status| {
+                format!("Cannot activate connection in invalid status: {:#?}", status)
+            })?;
         }
 
         // Invoke on_connect handler with timeout protection if configured
@@ -154,12 +159,12 @@ impl WsIoServerConnection {
             .await??;
         }
 
-        // Insert connection into namespace
-        self.namespace.insert_connection(self.clone());
-
         // Transition state to Ready
         self.status
             .try_transition(ConnectionStatus::Activating, ConnectionStatus::Ready)?;
+
+        // Insert connection into namespace
+        self.namespace.insert_connection(self.clone());
 
         // Send ready packet
         self.send_packet(&WsIoPacket::new_ready()).await?;
@@ -169,15 +174,6 @@ impl WsIoServerConnection {
             // Run handler asynchronously in a detached task
             self.spawn_task(on_ready_handler(self.clone()));
         }
-
-        Ok(())
-    }
-
-    #[inline]
-    fn ensure_status_ready(&self) -> Result<()> {
-        self.status.ensure(ConnectionStatus::Ready, |status| {
-            format!("Cannot emit event in invalid status: {:#?}", status)
-        })?;
 
         Ok(())
     }
@@ -222,10 +218,8 @@ impl WsIoServerConnection {
     }
 
     async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        Ok(self
-            .message_tx
-            .send(self.namespace.encode_packet_to_message(packet)?)
-            .await?)
+        self.send_message(self.namespace.encode_packet_to_message(packet)?)
+            .await
     }
 
     // Protected methods
@@ -238,8 +232,8 @@ impl WsIoServerConnection {
 
         // Leave all joined rooms
         let joined_rooms = self.joined_rooms.iter().map(|entry| entry.clone()).collect::<Vec<_>>();
-        for room_name in joined_rooms {
-            self.namespace.remove_connection_from_room(&room_name, self.id);
+        for room_name in &joined_rooms {
+            self.namespace.remove_connection_id_from_room(room_name, self.id);
         }
 
         self.joined_rooms.clear();
@@ -272,7 +266,15 @@ impl WsIoServerConnection {
         }
 
         // Send websocket close frame to initiate graceful shutdown
-        let _ = self.message_tx.try_send(Message::Close(None));
+        let _ = self.message_tx.try_send(Arc::new(Message::Close(None)));
+    }
+
+    pub(crate) async fn emit_event_message(&self, message: Arc<Message>) -> Result<()> {
+        self.status.ensure(ConnectionStatus::Ready, |status| {
+            format!("Cannot emit in invalid status: {:#?}", status)
+        })?;
+
+        self.send_message(message).await
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
@@ -335,6 +337,10 @@ impl WsIoServerConnection {
         }
     }
 
+    pub(crate) async fn send_message(&self, message: Arc<Message>) -> Result<()> {
+        Ok(self.message_tx.send(message).await?)
+    }
+
     // Public methods
     pub async fn disconnect(&self) {
         let _ = self.send_packet(&WsIoPacket::new_disconnect()).await;
@@ -342,18 +348,14 @@ impl WsIoServerConnection {
     }
 
     pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
-        self.ensure_status_ready()?;
-        self.send_packet(&WsIoPacket::new_event(
-            event.as_ref(),
-            data.map(|data| self.namespace.config.packet_codec.encode_data(data))
-                .transpose()?,
-        ))
+        self.emit_event_message(
+            self.namespace.encode_packet_to_message(&WsIoPacket::new_event(
+                event.as_ref(),
+                data.map(|data| self.namespace.config.packet_codec.encode_data(data))
+                    .transpose()?,
+            ))?,
+        )
         .await
-    }
-
-    pub async fn emit_message(&self, message: Message) -> Result<()> {
-        self.ensure_status_ready()?;
-        Ok(self.message_tx.send(message).await?)
     }
 
     #[cfg(feature = "connection-extensions")]
@@ -376,7 +378,7 @@ impl WsIoServerConnection {
     pub fn join<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
         for room_name in room_names {
             let room_name = room_name.as_ref();
-            self.namespace.add_connection_to_room(room_name, self.clone());
+            self.namespace.add_connection_id_to_room(room_name, self.id);
             self.joined_rooms.insert(room_name.to_string());
         }
     }
@@ -384,7 +386,9 @@ impl WsIoServerConnection {
     #[inline]
     pub fn leave<I: IntoIterator<Item = S>, S: AsRef<str>>(self: &Arc<Self>, room_names: I) {
         for room_name in room_names {
-            self.namespace.remove_connection_from_room(room_name.as_ref(), self.id);
+            self.namespace
+                .remove_connection_id_from_room(room_name.as_ref(), self.id);
+
             self.joined_rooms.remove(room_name.as_ref());
         }
     }

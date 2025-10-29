@@ -61,7 +61,7 @@ enum ConnectionStatus {
 pub struct WsIoClientConnection {
     cancel_token: ArcSwap<CancellationToken>,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
-    message_tx: Sender<Message>,
+    message_tx: Sender<Arc<Message>>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
     status: AtomicStatus<ConnectionStatus>,
@@ -76,7 +76,7 @@ impl TaskSpawner for WsIoClientConnection {
 
 impl WsIoClientConnection {
     #[inline]
-    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Message>) {
+    pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Arc<Message>>) {
         let channel_capacity = channel_capacity_from_websocket_config(&runtime.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
@@ -151,11 +151,12 @@ impl WsIoClientConnection {
                 )
                 .await??;
 
-                // Send Auth packet only if still in AwaitingReady state
-                if self.status.is(ConnectionStatus::AwaitingReady) {
-                    self.send_packet(&WsIoPacket::new(WsIoPacketType::Auth, None, Some(auth_data)))
-                        .await?;
-                }
+                // Ensure connection is still in AwaitingReady state
+                self.status.ensure(ConnectionStatus::AwaitingReady, |status| {
+                    format!("Cannot send auth response in invalid status: {:#?}", status)
+                })?;
+
+                self.send_packet(&WsIoPacket::new_auth(Some(auth_data))).await?;
             } else {
                 bail!("Auth required but no auth handler is configured");
             }
@@ -187,11 +188,12 @@ impl WsIoClientConnection {
         Ok(())
     }
 
+    async fn send_message(&self, message: Arc<Message>) -> Result<()> {
+        Ok(self.message_tx.send(message).await?)
+    }
+
     async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
-        Ok(self
-            .message_tx
-            .send(self.runtime.encode_packet_to_message(packet)?)
-            .await?)
+        self.send_message(self.runtime.encode_packet_to_message(packet)?).await
     }
 
     // Protected methods
@@ -228,7 +230,15 @@ impl WsIoClientConnection {
         }
 
         // Send websocket close frame to initiate graceful shutdown
-        let _ = self.message_tx.try_send(Message::Close(None));
+        let _ = self.message_tx.try_send(Arc::new(Message::Close(None)));
+    }
+
+    pub(crate) async fn emit_event_message(&self, message: Arc<Message>) -> Result<()> {
+        self.status.ensure(ConnectionStatus::Ready, |status| {
+            format!("Cannot emit event message in invalid status: {:#?}", status)
+        })?;
+
+        self.send_message(message).await
     }
 
     pub(crate) async fn handle_incoming_packet(self: &Arc<Self>, bytes: &[u8]) -> Result<()> {
@@ -264,14 +274,6 @@ impl WsIoClientConnection {
                 connection.close();
             }
         }));
-    }
-
-    pub(crate) async fn send_event_message(&self, message: Message) -> Result<()> {
-        self.status.ensure(ConnectionStatus::Ready, |status| {
-            format!("Cannot send event message in invalid status: {:#?}", status)
-        })?;
-
-        Ok(self.message_tx.send(message).await?)
     }
 
     // Public methods

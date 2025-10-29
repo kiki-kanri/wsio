@@ -42,7 +42,7 @@ impl WsIoPacketBincodeCodec {
     #[inline]
     pub(super) fn encode(&self, packet: &WsIoPacket) -> Result<Vec<u8>> {
         Ok(encode_to_vec(
-            &InnerPacketRef(&packet.data, &packet.key, &packet.r#type),
+            InnerPacketRef(&packet.data, &packet.key, &packet.r#type),
             standard(),
         )?)
     }

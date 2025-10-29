@@ -4,7 +4,6 @@ use anyhow::Result;
 use futures_util::{
     SinkExt,
     StreamExt,
-    future::join_all,
 };
 use http::HeaderMap;
 use hyper::upgrade::{
@@ -34,15 +33,22 @@ use tokio_tungstenite::{
 
 pub(crate) mod builder;
 mod config;
+pub mod operators;
 
-use self::config::WsIoServerNamespaceConfig;
+use self::{
+    config::WsIoServerNamespaceConfig,
+    operators::broadcast::WsIoServerNamespaceBroadcastOperator,
+};
 use crate::{
     WsIoServer,
     connection::WsIoServerConnection,
     core::{
         atomic::status::AtomicStatus,
         packet::WsIoPacket,
-        types::hashers::FxDashMap,
+        types::hashers::{
+            FxDashMap,
+            FxDashSet,
+        },
     },
     runtime::{
         WsIoServerRuntime,
@@ -64,7 +70,7 @@ pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
     connections: FxDashMap<u64, Arc<WsIoServerConnection>>,
     connection_task_set: Mutex<JoinSet<()>>,
-    rooms: FxDashMap<String, FxDashMap<u64, Arc<WsIoServerConnection>>>,
+    rooms: FxDashMap<String, Arc<FxDashSet<u64>>>,
     runtime: Arc<WsIoServerRuntime>,
     status: AtomicStatus<NamespaceStatus>,
 }
@@ -82,11 +88,6 @@ impl WsIoServerNamespace {
     }
 
     // Private methods
-    #[inline]
-    fn clone_connections(&self) -> Vec<Arc<WsIoServerConnection>> {
-        self.connections.iter().map(|entry| entry.value().clone()).collect()
-    }
-
     async fn handle_upgraded_request(self: &Arc<Self>, headers: HeaderMap, upgraded: Upgraded) -> Result<()> {
         // Create ws stream
         let mut ws_stream =
@@ -96,7 +97,7 @@ impl WsIoServerNamespace {
         // Check runtime and namespace status
         if !self.runtime.status.is(WsIoServerRuntimeStatus::Running) || !self.status.is(NamespaceStatus::Running) {
             ws_stream
-                .send(self.encode_packet_to_message(&WsIoPacket::new_disconnect())?)
+                .send((*self.encode_packet_to_message(&WsIoPacket::new_disconnect())?).clone())
                 .await?;
 
             let _ = ws_stream.close(None).await;
@@ -127,6 +128,7 @@ impl WsIoServerNamespace {
 
         let mut write_ws_stream_task = spawn(async move {
             while let Some(message) = message_rx.recv().await {
+                let message = (*message).clone();
                 let is_close = matches!(message, Message::Close(_));
                 if ws_stream_writer.send(message).await.is_err() {
                     break;
@@ -167,20 +169,21 @@ impl WsIoServerNamespace {
 
     // Protected methods
     #[inline]
-    pub(crate) fn add_connection_to_room(&self, room_name: &str, connection: Arc<WsIoServerConnection>) {
+    pub(crate) fn add_connection_id_to_room(&self, room_name: &str, connection_id: u64) {
         self.rooms
             .entry(room_name.to_string())
             .or_default()
-            .insert(connection.id(), connection);
+            .clone()
+            .insert(connection_id);
     }
 
     #[inline]
-    pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Message> {
+    pub(crate) fn encode_packet_to_message(&self, packet: &WsIoPacket) -> Result<Arc<Message>> {
         let bytes = self.config.packet_codec.encode(packet)?;
-        Ok(match self.config.packet_codec.is_text() {
+        Ok(Arc::new(match self.config.packet_codec.is_text() {
             true => Message::Text(unsafe { String::from_utf8_unchecked(bytes).into() }),
             false => Message::Binary(bytes.into()),
-        })
+        }))
     }
 
     pub(crate) async fn handle_on_upgrade_request(self: &Arc<Self>, headers: HeaderMap, on_upgrade: OnUpgrade) {
@@ -205,8 +208,8 @@ impl WsIoServerNamespace {
     }
 
     #[inline]
-    pub(crate) fn remove_connection_from_room(&self, room_name: &str, connection_id: u64) {
-        if let Some(room) = self.rooms.get(room_name) {
+    pub(crate) fn remove_connection_id_from_room(&self, room_name: &str, connection_id: u64) {
+        if let Some(room) = self.rooms.get(room_name).map(|entry| entry.clone()) {
             room.remove(&connection_id);
             if room.is_empty() {
                 self.rooms.remove(room_name);
@@ -220,25 +223,18 @@ impl WsIoServerNamespace {
         self.connections.len()
     }
 
-    pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
-        self.status.ensure(NamespaceStatus::Running, |status| {
-            format!("Cannot emit event in invalid status: {:#?}", status)
-        })?;
+    pub async fn emit<D: Serialize>(self: &Arc<Self>, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
+        WsIoServerNamespaceBroadcastOperator::new(self.clone())
+            .emit(event, data)
+            .await
+    }
 
-        let message = self.encode_packet_to_message(&WsIoPacket::new_event(
-            event.as_ref(),
-            data.map(|data| self.config.packet_codec.encode_data(data))
-                .transpose()?,
-        ))?;
-
-        join_all(
-            self.clone_connections()
-                .iter()
-                .map(|connection| connection.emit_message(message.clone())),
-        )
-        .await;
-
-        Ok(())
+    #[inline]
+    pub fn except<I: IntoIterator<Item = S>, S: AsRef<str>>(
+        self: &Arc<Self>,
+        room_names: I,
+    ) -> WsIoServerNamespaceBroadcastOperator {
+        WsIoServerNamespaceBroadcastOperator::new(self.clone()).except(room_names)
     }
 
     #[inline]
@@ -251,23 +247,28 @@ impl WsIoServerNamespace {
         WsIoServer(self.runtime.clone())
     }
 
-    pub async fn shutdown(&self) {
+    pub async fn shutdown(self: &Arc<Self>) {
         match self.status.get() {
             NamespaceStatus::Stopped => return,
             NamespaceStatus::Running => self.status.store(NamespaceStatus::Stopping),
             _ => unreachable!(),
         }
 
-        join_all(
-            self.clone_connections()
-                .iter()
-                .map(|connection| connection.disconnect()),
-        )
-        .await;
+        let _ = WsIoServerNamespaceBroadcastOperator::new(self.clone())
+            .disconnect()
+            .await;
 
         let mut connection_task_set = self.connection_task_set.lock().await;
         while connection_task_set.join_next().await.is_some() {}
 
         self.status.store(NamespaceStatus::Stopped);
+    }
+
+    #[inline]
+    pub fn to<I: IntoIterator<Item = S>, S: AsRef<str>>(
+        self: &Arc<Self>,
+        room_names: I,
+    ) -> WsIoServerNamespaceBroadcastOperator {
+        WsIoServerNamespaceBroadcastOperator::new(self.clone()).to(room_names)
     }
 }

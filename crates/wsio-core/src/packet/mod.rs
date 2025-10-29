@@ -53,6 +53,11 @@ impl WsIoPacket {
 
     // Public methods
     #[inline]
+    pub fn new_auth(data: Option<Vec<u8>>) -> Self {
+        Self::new(WsIoPacketType::Auth, None, data)
+    }
+
+    #[inline]
     pub fn new_disconnect() -> Self {
         Self::new(WsIoPacketType::Disconnect, None, None)
     }

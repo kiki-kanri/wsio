@@ -30,6 +30,7 @@ impl WsIoServerNamespaceBuilder {
                 auth_handler: None,
                 auth_handler_timeout: runtime.config.auth_handler_timeout,
                 auth_packet_timeout: runtime.config.auth_packet_timeout,
+                broadcast_concurrency_limit: runtime.config.broadcast_concurrency_limit,
                 middleware: None,
                 middleware_execution_timeout: runtime.config.middleware_execution_timeout,
                 on_connect_handler: None,
@@ -52,6 +53,11 @@ impl WsIoServerNamespaceBuilder {
 
     pub fn auth_packet_timeout(mut self, duration: Duration) -> Self {
         self.config.auth_packet_timeout = duration;
+        self
+    }
+
+    pub fn broadcast_concurrency_limit(mut self, broadcast_concurrency_limit: usize) -> Self {
+        self.config.broadcast_concurrency_limit = broadcast_concurrency_limit;
         self
     }
 

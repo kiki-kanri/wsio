@@ -40,6 +40,8 @@ pub(crate) struct WsIoServerNamespaceConfig {
     /// Maximum duration to wait for the client to send the auth packet.
     pub(crate) auth_packet_timeout: Duration,
 
+    pub(crate) broadcast_concurrency_limit: usize,
+
     pub(crate) middleware: Option<BoxAsyncUnaryResultHandler<WsIoServerConnection>>,
 
     /// Maximum duration allowed for middleware execution.

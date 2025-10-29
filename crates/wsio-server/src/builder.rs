@@ -20,6 +20,7 @@ impl WsIoServerBuilder {
             config: WsIoServerConfig {
                 auth_handler_timeout: Duration::from_secs(3),
                 auth_packet_timeout: Duration::from_secs(5),
+                broadcast_concurrency_limit: 512,
                 middleware_execution_timeout: Duration::from_secs(3),
                 on_close_handler_timeout: Duration::from_secs(2),
                 on_connect_handler_timeout: Duration::from_secs(2),
@@ -43,6 +44,11 @@ impl WsIoServerBuilder {
 
     pub fn auth_packet_timeout(mut self, duration: Duration) -> Self {
         self.config.auth_packet_timeout = duration;
+        self
+    }
+
+    pub fn broadcast_concurrency_limit(mut self, broadcast_concurrency_limit: usize) -> Self {
+        self.config.broadcast_concurrency_limit = broadcast_concurrency_limit;
         self
     }
 
