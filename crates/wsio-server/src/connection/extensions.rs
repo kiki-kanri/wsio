@@ -6,17 +6,19 @@ use std::{
     sync::Arc,
 };
 
-use dashmap::DashMap;
+use crate::core::types::hashers::FxDashMap;
 
 // Structs
 pub struct ConnectionExtensions {
-    inner: DashMap<TypeId, Arc<dyn Any + Send + Sync>>,
+    inner: FxDashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
 
 impl ConnectionExtensions {
     #[inline]
     pub(super) fn new() -> Self {
-        Self { inner: DashMap::new() }
+        Self {
+            inner: FxDashMap::default(),
+        }
     }
 
     // Public methods

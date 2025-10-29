@@ -5,6 +5,8 @@ use std::{
 
 use anyhow::Result;
 
+pub mod hashers;
+
 type AsyncUnaryResultHandler<T> =
     dyn Fn(Arc<T>) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> + Send + Sync + 'static;
 

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use dashmap::DashMap;
 use futures_util::{
     SinkExt,
     StreamExt,
@@ -43,6 +42,7 @@ use crate::{
     core::{
         atomic::status::AtomicStatus,
         packet::WsIoPacket,
+        types::hashers::FxDashMap,
     },
     runtime::{
         WsIoServerRuntime,
@@ -62,9 +62,9 @@ enum NamespaceStatus {
 // Structs
 pub struct WsIoServerNamespace {
     pub(crate) config: WsIoServerNamespaceConfig,
-    connections: DashMap<u64, Arc<WsIoServerConnection>>,
+    connections: FxDashMap<u64, Arc<WsIoServerConnection>>,
     connection_task_set: Mutex<JoinSet<()>>,
-    rooms: DashMap<String, DashMap<u64, Arc<WsIoServerConnection>>>,
+    rooms: FxDashMap<String, FxDashMap<u64, Arc<WsIoServerConnection>>>,
     runtime: Arc<WsIoServerRuntime>,
     status: AtomicStatus<NamespaceStatus>,
 }
@@ -73,9 +73,9 @@ impl WsIoServerNamespace {
     fn new(config: WsIoServerNamespaceConfig, runtime: Arc<WsIoServerRuntime>) -> Arc<Self> {
         Arc::new(Self {
             config,
-            connections: DashMap::new(),
+            connections: FxDashMap::default(),
             connection_task_set: Mutex::new(JoinSet::new()),
-            rooms: DashMap::new(),
+            rooms: FxDashMap::default(),
             runtime,
             status: AtomicStatus::new(NamespaceStatus::Running),
         })

@@ -1,13 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use anyhow::{
     Result,
     bail,
 };
-use dashmap::DashSet;
 use futures_util::future::join_all;
 use num_enum::{
     IntoPrimitive,
@@ -18,7 +14,13 @@ use serde::Serialize;
 
 use crate::{
     config::WsIoServerConfig,
-    core::atomic::status::AtomicStatus,
+    core::{
+        atomic::status::AtomicStatus,
+        types::hashers::{
+            FxDashSet,
+            FxHashMap,
+        },
+    },
     namespace::{
         WsIoServerNamespace,
         builder::WsIoServerNamespaceBuilder,
@@ -37,8 +39,8 @@ pub(crate) enum WsIoServerRuntimeStatus {
 // Structs
 pub(crate) struct WsIoServerRuntime {
     pub(crate) config: WsIoServerConfig,
-    connection_ids: DashSet<u64>,
-    namespaces: RwLock<HashMap<String, Arc<WsIoServerNamespace>>>,
+    connection_ids: FxDashSet<u64>,
+    namespaces: RwLock<FxHashMap<String, Arc<WsIoServerNamespace>>>,
     pub(crate) status: AtomicStatus<WsIoServerRuntimeStatus>,
 }
 
@@ -46,8 +48,8 @@ impl WsIoServerRuntime {
     pub(crate) fn new(config: WsIoServerConfig) -> Arc<Self> {
         Arc::new(Self {
             config,
-            connection_ids: DashSet::new(),
-            namespaces: RwLock::new(HashMap::new()),
+            connection_ids: FxDashSet::default(),
+            namespaces: RwLock::new(FxHashMap::default()),
             status: AtomicStatus::new(WsIoServerRuntimeStatus::Running),
         })
     }

@@ -12,7 +12,6 @@ use anyhow::{
     bail,
 };
 use arc_swap::ArcSwap;
-use dashmap::DashSet;
 use http::HeaderMap;
 use num_enum::{
     IntoPrimitive,
@@ -57,7 +56,10 @@ use crate::{
             WsIoPacketType,
         },
         traits::task::spawner::TaskSpawner,
-        types::BoxAsyncUnaryResultHandler,
+        types::{
+            BoxAsyncUnaryResultHandler,
+            hashers::FxDashSet,
+        },
         utils::task::abort_locked_task,
     },
     namespace::WsIoServerNamespace,
@@ -85,7 +87,7 @@ pub struct WsIoServerConnection {
     extensions: ConnectionExtensions,
     headers: HeaderMap,
     id: u64,
-    joined_rooms: DashSet<String>,
+    joined_rooms: FxDashSet<String>,
     message_tx: Sender<Message>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
@@ -113,7 +115,7 @@ impl WsIoServerConnection {
                 extensions: ConnectionExtensions::new(),
                 headers,
                 id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
-                joined_rooms: DashSet::new(),
+                joined_rooms: FxDashSet::default(),
                 message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),

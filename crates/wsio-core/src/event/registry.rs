@@ -3,10 +3,7 @@ use std::{
         Any,
         TypeId,
     },
-    collections::{
-        HashMap,
-        hash_map::Entry,
-    },
+    collections::hash_map::Entry,
     marker::PhantomData,
     pin::Pin,
     sync::{
@@ -26,6 +23,7 @@ use serde::de::DeserializeOwned;
 use crate::{
     packet::codecs::WsIoPacketCodec,
     traits::task::spawner::TaskSpawner,
+    types::hashers::FxHashMap,
 };
 
 // Types
@@ -41,12 +39,12 @@ type Handler<C> = Arc<
 struct EventEntry<C> {
     data_decoder: DataDecoder,
     data_type_id: TypeId,
-    handlers: RwLock<HashMap<u32, Handler<C>>>,
+    handlers: RwLock<FxHashMap<u32, Handler<C>>>,
 }
 
 pub struct WsIoEventRegistry<C: Send + Sync + 'static, S: TaskSpawner> {
     _task_spawner: PhantomData<S>,
-    event_entries: RwLock<HashMap<String, Arc<EventEntry<C>>>>,
+    event_entries: RwLock<FxHashMap<String, Arc<EventEntry<C>>>>,
     next_handler_id: AtomicU32,
 }
 
@@ -61,7 +59,7 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
     pub fn new() -> Self {
         Self {
             _task_spawner: PhantomData,
-            event_entries: RwLock::new(HashMap::new()),
+            event_entries: RwLock::new(FxHashMap::default()),
             next_handler_id: AtomicU32::new(0),
         }
     }
@@ -147,7 +145,7 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
             Entry::Vacant(vacant) => vacant.insert(Arc::new(EventEntry {
                 data_decoder: decode_data_as_any_arc::<D>,
                 data_type_id,
-                handlers: RwLock::new(HashMap::new()),
+                handlers: RwLock::new(FxHashMap::default()),
             })),
         };
 
