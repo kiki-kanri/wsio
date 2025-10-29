@@ -24,13 +24,13 @@ Since development is not yet complete, documentation is currently unavailable. H
 - server event register
 - disconnect
 - multi packet codec
+- rooms
+- namespace broadcast/disconnect rooms
 - and more...
 
 ## TODO
 
 - any todo comments
-- rooms
-- to rooms and emit
 - check errors and efficacy
 - docs
 - extract and merge duplicate code
