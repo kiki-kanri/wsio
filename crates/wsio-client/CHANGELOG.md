@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.5.1...wsio-client-v0.6.0) - 2025-10-30 12:55
+
+### 🎨 Styles
+
+- update string formatting style in some parts of the code ([1195fd0](https://github.com/ws-io/ws.io-rs/commit/1195fd0))
+
+### 💅 Refactors
+
+- *(client)* separate `connect_url` field from config and normalize path when setting via `builder.request_path` ([5f9bfa5](https://github.com/ws-io/ws.io-rs/commit/5f9bfa5))
+
+### 🚀 Enhancements
+
+- [**breaking**] update custom protocol handshake behavior, all auth-related behavior and replace with init-based flow ([a85248b](https://github.com/ws-io/ws.io-rs/commit/a85248b))
+
+### 🩹 Fixes
+
+- *(client)* preserve original query when processing input URI on client side ([5216c9b](https://github.com/ws-io/ws.io-rs/commit/5216c9b))
+
 ## [0.5.1](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.5.0...wsio-client-v0.5.1) - 2025-10-29 06:31
 
 ### 🏡 Chore

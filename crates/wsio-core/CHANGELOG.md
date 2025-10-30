@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.6.1...wsio-core-v0.7.0) - 2025-10-30 12:55
+
+### 🎨 Styles
+
+- update string formatting style in some parts of the code ([1195fd0](https://github.com/ws-io/ws.io-rs/commit/1195fd0))
+
+### 🚀 Enhancements
+
+- [**breaking**] update custom protocol handshake behavior, all auth-related behavior and replace with init-based flow ([a85248b](https://github.com/ws-io/ws.io-rs/commit/a85248b))
+
 ## [0.6.1](https://github.com/ws-io/ws.io-rs/compare/wsio-core-v0.6.0...wsio-core-v0.6.1) - 2025-10-29 06:31
 
 ### 🏡 Chore

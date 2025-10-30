@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.7.0...wsio-server-v0.8.0) - 2025-10-30 12:55
+
+### 🎨 Styles
+
+- update string formatting style in some parts of the code ([1195fd0](https://github.com/ws-io/ws.io-rs/commit/1195fd0))
+
+### 📖 Documentation
+
+- update README ([d5ccbd1](https://github.com/ws-io/ws.io-rs/commit/d5ccbd1))
+
+### 🚀 Enhancements
+
+- *(server)* add `request_uri` getter to `WsIoServerConnection` ([6ddfec2](https://github.com/ws-io/ws.io-rs/commit/6ddfec2))
+- [**breaking**] update custom protocol handshake behavior, all auth-related behavior and replace with init-based flow ([a85248b](https://github.com/ws-io/ws.io-rs/commit/a85248b))
+
 ## [0.7.0](https://github.com/ws-io/ws.io-rs/compare/wsio-server-v0.6.0...wsio-server-v0.7.0) - 2025-10-29 06:31
 
 ### 🏡 Chore
