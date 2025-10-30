@@ -18,9 +18,10 @@ impl WsIoServerBuilder {
     pub(crate) fn new() -> Self {
         Self {
             config: WsIoServerConfig {
-                auth_handler_timeout: Duration::from_secs(3),
-                auth_packet_timeout: Duration::from_secs(5),
                 broadcast_concurrency_limit: 512,
+                init_request_handler_timeout: Duration::from_secs(3),
+                init_response_handler_timeout: Duration::from_secs(3),
+                init_response_timeout: Duration::from_secs(5),
                 middleware_execution_timeout: Duration::from_secs(3),
                 on_close_handler_timeout: Duration::from_secs(2),
                 on_connect_handler_timeout: Duration::from_secs(2),
@@ -37,16 +38,6 @@ impl WsIoServerBuilder {
     }
 
     // Public methods
-    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
-        self.config.auth_handler_timeout = duration;
-        self
-    }
-
-    pub fn auth_packet_timeout(mut self, duration: Duration) -> Self {
-        self.config.auth_packet_timeout = duration;
-        self
-    }
-
     pub fn broadcast_concurrency_limit(mut self, broadcast_concurrency_limit: usize) -> Self {
         self.config.broadcast_concurrency_limit = broadcast_concurrency_limit;
         self
@@ -54,6 +45,21 @@ impl WsIoServerBuilder {
 
     pub fn build(self) -> WsIoServer {
         WsIoServer(WsIoServerRuntime::new(self.config))
+    }
+
+    pub fn init_request_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_request_handler_timeout = duration;
+        self
+    }
+
+    pub fn init_response_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_response_handler_timeout = duration;
+        self
+    }
+
+    pub fn init_response_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_response_timeout = duration;
+        self
     }
 
     pub fn middleware_execution_timeout(mut self, duration: Duration) -> Self {

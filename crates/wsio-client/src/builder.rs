@@ -7,7 +7,10 @@ use anyhow::{
     Result,
     bail,
 };
-use serde::Serialize;
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use url::Url;
 
@@ -35,8 +38,8 @@ impl WsIoClientBuilder {
         url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
-                auth_handler: None,
-                auth_handler_timeout: Duration::from_secs(3),
+                init_handler: None,
+                init_handler_timeout: Duration::from_secs(3),
                 init_packet_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
                 on_connection_close_handler_timeout: Duration::from_secs(2),
@@ -64,28 +67,13 @@ impl WsIoClientBuilder {
     }
 
     // Public methods
-    pub fn auth<H, Fut, D>(mut self, handler: H) -> WsIoClientBuilder
-    where
-        D: Serialize,
-        H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<D>> + Send + 'static,
-    {
-        let handler = Arc::new(handler);
-        self.config.auth_handler = Some(Box::new(move |connection, packet_codec| {
-            let handler = handler.clone();
-            Box::pin(async move { packet_codec.encode_data(&handler(connection).await?) })
-        }));
-
-        self
-    }
-
-    pub fn auth_handler_timeout(mut self, duration: Duration) -> Self {
-        self.config.auth_handler_timeout = duration;
-        self
-    }
-
     pub fn build(self) -> WsIoClient {
         WsIoClient(WsIoClientRuntime::new(self.config, self.connect_url))
+    }
+
+    pub fn init_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.init_handler_timeout = duration;
+        self
     }
 
     pub fn init_packet_timeout(mut self, duration: Duration) -> Self {
@@ -145,6 +133,30 @@ impl WsIoClientBuilder {
 
     pub fn websocket_config_mut<F: FnOnce(&mut WebSocketConfig)>(mut self, f: F) -> Self {
         f(&mut self.config.websocket_config);
+        self
+    }
+
+    pub fn with_init_handler<H, Fut, D, R>(mut self, handler: H) -> WsIoClientBuilder
+    where
+        H: Fn(Arc<WsIoClientConnection>, Option<D>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Option<R>>> + Send + 'static,
+        D: DeserializeOwned + Send + 'static,
+        R: Serialize + Send + 'static,
+    {
+        let handler = Arc::new(handler);
+        self.config.init_handler = Some(Box::new(move |connection, bytes, packet_codec| {
+            let handler = handler.clone();
+            Box::pin(async move {
+                handler(
+                    connection,
+                    bytes.map(|bytes| packet_codec.decode_data(bytes)).transpose()?,
+                )
+                .await?
+                .map(|data| packet_codec.encode_data(&data))
+                .transpose()
+            })
+        }));
+
         self
     }
 }

@@ -70,23 +70,23 @@ use crate::{
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 enum ConnectionStatus {
     Activating,
-    Authenticating,
-    AwaitingAuth,
+    AwaitingInit,
     Closed,
     Closing,
     Created,
+    Initiating,
     Ready,
 }
 
 // Structs
 pub struct WsIoServerConnection {
-    auth_timeout_task: Mutex<Option<JoinHandle<()>>>,
     cancel_token: ArcSwap<CancellationToken>,
     event_registry: WsIoEventRegistry<WsIoServerConnection, WsIoServerConnection>,
     #[cfg(feature = "connection-extensions")]
     extensions: ConnectionExtensions,
     headers: HeaderMap,
     id: u64,
+    init_timeout_task: Mutex<Option<JoinHandle<()>>>,
     joined_rooms: FxDashSet<String>,
     message_tx: Sender<Arc<Message>>,
     namespace: Arc<WsIoServerNamespace>,
@@ -108,13 +108,13 @@ impl WsIoServerConnection {
         let (message_tx, message_rx) = channel(channel_capacity);
         (
             Arc::new(Self {
-                auth_timeout_task: Mutex::new(None),
                 cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
                 event_registry: WsIoEventRegistry::new(),
                 #[cfg(feature = "connection-extensions")]
                 extensions: ConnectionExtensions::new(),
                 headers,
                 id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
+                init_timeout_task: Mutex::new(None),
                 joined_rooms: FxDashSet::default(),
                 message_tx,
                 namespace,
@@ -126,15 +126,42 @@ impl WsIoServerConnection {
     }
 
     // Private methods
-    async fn activate(self: &Arc<Self>) -> Result<()> {
-        // Verify current state; only valid from Authenticating or Created → Activating
+    #[inline]
+    fn handle_event_packet(self: &Arc<Self>, event: &str, packet_data: Option<Vec<u8>>) -> Result<()> {
+        self.event_registry.dispatch_event_packet(
+            self.clone(),
+            event,
+            &self.namespace.config.packet_codec,
+            packet_data,
+            self,
+        );
+
+        Ok(())
+    }
+
+    async fn handle_init_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
+        // Verify current state; only valid from AwaitingInit → Initiating
         let status = self.status.get();
         match status {
-            ConnectionStatus::Authenticating | ConnectionStatus::Created => {
-                self.status.try_transition(status, ConnectionStatus::Activating)?
-            }
-            _ => bail!("Cannot activate connection in invalid status: {:#?}", status),
+            ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
+            _ => bail!("Received init packet in invalid status: {:#?}", status),
         }
+
+        // Abort init-timeout task if still active
+        abort_locked_task(&self.init_timeout_task).await;
+
+        // Invoke init_response handler with timeout protection if configured
+        if let Some(init_response_handler) = &self.namespace.config.init_response_handler {
+            timeout(
+                self.namespace.config.init_response_handler_timeout,
+                init_response_handler(self.clone(), packet_data, &self.namespace.config.packet_codec),
+            )
+            .await??
+        }
+
+        // Activate connection
+        self.status
+            .try_transition(ConnectionStatus::Initiating, ConnectionStatus::Activating)?;
 
         // Invoke middleware with timeout protection if configured
         if let Some(middleware) = &self.namespace.config.middleware {
@@ -178,45 +205,6 @@ impl WsIoServerConnection {
         Ok(())
     }
 
-    async fn handle_auth_packet(self: &Arc<Self>, packet_data: &[u8]) -> Result<()> {
-        // Verify current state; only valid from AwaitingAuth → Authenticating
-        let status = self.status.get();
-        match status {
-            ConnectionStatus::AwaitingAuth => self.status.try_transition(status, ConnectionStatus::Authenticating)?,
-            _ => bail!("Received auth packet in invalid status: {:#?}", status),
-        }
-
-        // Abort auth-timeout task if still active
-        abort_locked_task(&self.auth_timeout_task).await;
-
-        // Invoke auth handler with timeout protection if configured, otherwise raise error
-        if let Some(auth_handler) = &self.namespace.config.auth_handler {
-            timeout(
-                self.namespace.config.auth_handler_timeout,
-                auth_handler(self.clone(), packet_data, &self.namespace.config.packet_codec),
-            )
-            .await??;
-
-            // Activate connection
-            self.activate().await
-        } else {
-            bail!("Auth packet received but no auth handler is configured");
-        }
-    }
-
-    #[inline]
-    fn handle_event_packet(self: &Arc<Self>, event: &str, packet_data: Option<Vec<u8>>) -> Result<()> {
-        self.event_registry.dispatch_event_packet(
-            self.clone(),
-            event,
-            &self.namespace.config.packet_codec,
-            packet_data,
-            self,
-        );
-
-        Ok(())
-    }
-
     async fn send_packet(&self, packet: &WsIoPacket) -> Result<()> {
         self.send_message(self.namespace.encode_packet_to_message(packet)?)
             .await
@@ -238,8 +226,8 @@ impl WsIoServerConnection {
 
         self.joined_rooms.clear();
 
-        // Abort auth-timeout task if still active
-        abort_locked_task(&self.auth_timeout_task).await;
+        // Abort init-timeout task if still active
+        abort_locked_task(&self.init_timeout_task).await;
 
         // Cancel all ongoing operations via cancel token
         self.cancel_token.load().cancel();
@@ -281,13 +269,6 @@ impl WsIoServerConnection {
         // TODO: lazy load
         let packet = self.namespace.config.packet_codec.decode(bytes)?;
         match packet.r#type {
-            WsIoPacketType::Auth => {
-                if let Some(packet_data) = packet.data.as_deref() {
-                    self.handle_auth_packet(packet_data).await
-                } else {
-                    bail!("Auth packet missing data");
-                }
-            }
             WsIoPacketType::Event => {
                 if let Some(event) = packet.key.as_deref() {
                     self.handle_event_packet(event, packet.data)
@@ -295,6 +276,7 @@ impl WsIoServerConnection {
                     bail!("Event packet missing key");
                 }
             }
+            WsIoPacketType::Init => self.handle_init_packet(packet.data.as_deref()).await,
             _ => Ok(()),
         }
     }
@@ -305,36 +287,32 @@ impl WsIoServerConnection {
             format!("Cannot init connection in invalid status: {:#?}", status)
         })?;
 
-        // Determine if authentication is required
-        let requires_auth = self.namespace.config.auth_handler.is_some();
-
-        // Build Init packet to inform client whether auth is required
-        let packet = &WsIoPacket::new_init(self.namespace.config.packet_codec.encode_data(&requires_auth)?);
-
-        // If authentication is required
-        if requires_auth {
-            // Transition state to AwaitingAuth
-            self.status
-                .try_transition(ConnectionStatus::Created, ConnectionStatus::AwaitingAuth)?;
-
-            // Spawn auth-packet-timeout watchdog to close connection if auth not received in time
-            let connection = self.clone();
-            *self.auth_timeout_task.lock().await = Some(spawn(async move {
-                sleep(connection.namespace.config.auth_packet_timeout).await;
-                if connection.status.is(ConnectionStatus::AwaitingAuth) {
-                    connection.close();
-                }
-            }));
-
-            // Send Init packet to client (expecting auth response)
-            self.send_packet(packet).await
+        // Generate init request data if init request handler is configured
+        let init_request_data = if let Some(init_request_handler) = &self.namespace.config.init_request_handler {
+            timeout(
+                self.namespace.config.init_request_handler_timeout,
+                init_request_handler(self.clone(), &self.namespace.config.packet_codec),
+            )
+            .await??
         } else {
-            // Send Init packet to client (no auth required)
-            self.send_packet(packet).await?;
+            None
+        };
 
-            // Immediately activate connection
-            self.activate().await
-        }
+        // Transition state to AwaitingInit
+        self.status
+            .try_transition(ConnectionStatus::Created, ConnectionStatus::AwaitingInit)?;
+
+        // Spawn init-response-timeout watchdog to close connection if init not received in time
+        let connection = self.clone();
+        *self.init_timeout_task.lock().await = Some(spawn(async move {
+            sleep(connection.namespace.config.init_response_timeout).await;
+            if connection.status.is(ConnectionStatus::AwaitingInit) {
+                connection.close();
+            }
+        }));
+
+        // Send init packet
+        self.send_packet(&WsIoPacket::new_init(init_request_data)).await
     }
 
     pub(crate) async fn send_message(&self, message: Arc<Message>) -> Result<()> {

@@ -19,11 +19,12 @@ use crate::{
 };
 
 // Types
-type AuthHandler = Box<
+type InitHandler = Box<
     dyn for<'a> Fn(
             Arc<WsIoClientConnection>,
+            Option<&'a [u8]>,
             &'a WsIoPacketCodec,
-        ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>>> + Send + 'a>>
+        ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'a>>
         + Send
         + Sync
         + 'static,
@@ -31,12 +32,12 @@ type AuthHandler = Box<
 
 // Structs
 pub(crate) struct WsIoClientConfig {
-    pub(crate) auth_handler: Option<AuthHandler>,
+    pub(crate) init_handler: Option<InitHandler>,
 
-    /// Maximum duration allowed for the auth handler to execute.
-    pub(crate) auth_handler_timeout: Duration,
+    /// Maximum duration allowed for the init handler to execute.
+    pub(crate) init_handler_timeout: Duration,
 
-    /// Maximum duration to wait for the client to send the init packet.
+    /// Maximum duration to wait for the server to send the init packet.
     pub(crate) init_packet_timeout: Duration,
 
     pub(crate) on_connection_close_handler: Option<BoxAsyncUnaryResultHandler<WsIoClientConnection>>,

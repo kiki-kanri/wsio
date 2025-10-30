@@ -113,7 +113,7 @@ impl WsIoClientConnection {
         Ok(())
     }
 
-    async fn handle_init_packet(self: &Arc<Self>, packet_data: &[u8]) -> Result<()> {
+    async fn handle_init_packet(self: &Arc<Self>, packet_data: Option<&[u8]>) -> Result<()> {
         // Verify current state; only valid from AwaitingInit → Initiating
         let status = self.status.get();
         match status {
@@ -124,8 +124,16 @@ impl WsIoClientConnection {
         // Abort init-timeout task if still active
         abort_locked_task(&self.init_timeout_task).await;
 
-        // Decode init packet to determine if authentication is required
-        let requires_auth = self.runtime.config.packet_codec.decode_data::<bool>(packet_data)?;
+        // Invoke init_handler with timeout protection if configured
+        let response_data = if let Some(init_handler) = &self.runtime.config.init_handler {
+            timeout(
+                self.runtime.config.init_handler_timeout,
+                init_handler(self.clone(), packet_data, &self.runtime.config.packet_codec),
+            )
+            .await??
+        } else {
+            None
+        };
 
         // Transition state to AwaitingReady
         self.status
@@ -140,29 +148,8 @@ impl WsIoClientConnection {
             }
         }));
 
-        // If authentication is required
-        if requires_auth {
-            // Ensure auth handler is configured
-            if let Some(auth_handler) = &self.runtime.config.auth_handler {
-                // Execute auth handler with timeout protection
-                let auth_data = timeout(
-                    self.runtime.config.auth_handler_timeout,
-                    auth_handler(self.clone(), &self.runtime.config.packet_codec),
-                )
-                .await??;
-
-                // Ensure connection is still in AwaitingReady state
-                self.status.ensure(ConnectionStatus::AwaitingReady, |status| {
-                    format!("Cannot send auth response in invalid status: {:#?}", status)
-                })?;
-
-                self.send_packet(&WsIoPacket::new_auth(Some(auth_data))).await?;
-            } else {
-                bail!("Auth required but no auth handler is configured");
-            }
-        }
-
-        Ok(())
+        // Send init packet
+        self.send_packet(&WsIoPacket::new_init(response_data)).await
     }
 
     async fn handle_ready_packet(self: &Arc<Self>) -> Result<()> {
@@ -253,15 +240,8 @@ impl WsIoClientConnection {
                     bail!("Event packet missing key");
                 }
             }
-            WsIoPacketType::Init => {
-                if let Some(packet_data) = packet.data.as_deref() {
-                    self.handle_init_packet(packet_data).await
-                } else {
-                    bail!("Init packet missing data");
-                }
-            }
+            WsIoPacketType::Init => self.handle_init_packet(packet.data.as_deref()).await,
             WsIoPacketType::Ready => self.handle_ready_packet().await,
-            _ => Ok(()),
         }
     }
 

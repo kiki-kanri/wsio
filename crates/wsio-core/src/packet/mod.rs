@@ -14,11 +14,10 @@ pub mod codecs;
 #[repr(u8)]
 #[derive(Clone, Debug, Deserialize_repr, Serialize_repr)]
 pub enum WsIoPacketType {
-    Auth = 0,
-    Disconnect = 1,
-    Event = 2,
-    Init = 3,
-    Ready = 4,
+    Disconnect = 0,
+    Event = 1,
+    Init = 2,
+    Ready = 3,
 }
 
 // Structs
@@ -63,11 +62,6 @@ impl WsIoPacket {
 
     // Public methods
     #[inline]
-    pub fn new_auth(data: Option<Vec<u8>>) -> Self {
-        Self::new(WsIoPacketType::Auth, None, data)
-    }
-
-    #[inline]
     pub fn new_disconnect() -> Self {
         Self::new(WsIoPacketType::Disconnect, None, None)
     }
@@ -78,8 +72,8 @@ impl WsIoPacket {
     }
 
     #[inline]
-    pub fn new_init(data: Vec<u8>) -> Self {
-        Self::new(WsIoPacketType::Init, None, Some(data))
+    pub fn new_init(data: Option<Vec<u8>>) -> Self {
+        Self::new(WsIoPacketType::Init, None, data)
     }
 
     #[inline]
