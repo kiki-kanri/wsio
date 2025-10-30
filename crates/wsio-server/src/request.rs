@@ -75,7 +75,7 @@ pub(super) async fn dispatch_request<ReqBody, ResBody: Default, E: Send>(
     };
 
     namespace
-        .handle_on_upgrade_request(request.headers().clone(), on_upgrade)
+        .handle_on_upgrade_request(request.headers().clone(), on_upgrade, request.uri().clone())
         .await;
 
     Ok(Response::builder()

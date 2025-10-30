@@ -5,7 +5,10 @@ use futures_util::{
     SinkExt,
     StreamExt,
 };
-use http::HeaderMap;
+use http::{
+    HeaderMap,
+    Uri,
+};
 use hyper::upgrade::{
     OnUpgrade,
     Upgraded,
@@ -88,7 +91,12 @@ impl WsIoServerNamespace {
     }
 
     // Private methods
-    async fn handle_upgraded_request(self: &Arc<Self>, headers: HeaderMap, upgraded: Upgraded) -> Result<()> {
+    async fn handle_upgraded_request(
+        self: &Arc<Self>,
+        headers: HeaderMap,
+        request_uri: Uri,
+        upgraded: Upgraded,
+    ) -> Result<()> {
         // Create ws stream
         let mut ws_stream =
             WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, Some(self.config.websocket_config))
@@ -105,7 +113,7 @@ impl WsIoServerNamespace {
         }
 
         // Create connection
-        let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone());
+        let (connection, mut message_rx) = WsIoServerConnection::new(headers, self.clone(), request_uri);
 
         // Split ws stream and spawn read and write tasks
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
@@ -186,11 +194,16 @@ impl WsIoServerNamespace {
         }))
     }
 
-    pub(crate) async fn handle_on_upgrade_request(self: &Arc<Self>, headers: HeaderMap, on_upgrade: OnUpgrade) {
+    pub(crate) async fn handle_on_upgrade_request(
+        self: &Arc<Self>,
+        headers: HeaderMap,
+        on_upgrade: OnUpgrade,
+        request_uri: Uri,
+    ) {
         let namespace = self.clone();
         self.connection_task_set.lock().await.spawn(async move {
             if let Ok(upgraded) = on_upgrade.await {
-                let _ = namespace.handle_upgraded_request(headers, upgraded).await;
+                let _ = namespace.handle_upgraded_request(headers, request_uri, upgraded).await;
             }
         });
     }

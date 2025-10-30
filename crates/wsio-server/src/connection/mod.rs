@@ -12,7 +12,10 @@ use anyhow::{
     bail,
 };
 use arc_swap::ArcSwap;
-use http::HeaderMap;
+use http::{
+    HeaderMap,
+    Uri,
+};
 use num_enum::{
     IntoPrimitive,
     TryFromPrimitive,
@@ -91,6 +94,7 @@ pub struct WsIoServerConnection {
     message_tx: Sender<Arc<Message>>,
     namespace: Arc<WsIoServerNamespace>,
     on_close_handler: Mutex<Option<BoxAsyncUnaryResultHandler<Self>>>,
+    request_uri: Uri,
     status: AtomicStatus<ConnectionStatus>,
 }
 
@@ -103,7 +107,11 @@ impl TaskSpawner for WsIoServerConnection {
 
 impl WsIoServerConnection {
     #[inline]
-    pub(crate) fn new(headers: HeaderMap, namespace: Arc<WsIoServerNamespace>) -> (Arc<Self>, Receiver<Arc<Message>>) {
+    pub(crate) fn new(
+        headers: HeaderMap,
+        namespace: Arc<WsIoServerNamespace>,
+        request_uri: Uri,
+    ) -> (Arc<Self>, Receiver<Arc<Message>>) {
         let channel_capacity = channel_capacity_from_websocket_config(&namespace.config.websocket_config);
         let (message_tx, message_rx) = channel(channel_capacity);
         (
@@ -119,6 +127,7 @@ impl WsIoServerConnection {
                 message_tx,
                 namespace,
                 on_close_handler: Mutex::new(None),
+                request_uri,
                 status: AtomicStatus::new(ConnectionStatus::Created),
             }),
             message_rx,
@@ -402,6 +411,11 @@ impl WsIoServerConnection {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         *self.on_close_handler.lock().await = Some(Box::new(move |connection| Box::pin(handler(connection))));
+    }
+
+    #[inline]
+    pub fn request_uri(&self) -> &Uri {
+        &self.request_uri
     }
 
     #[inline]
