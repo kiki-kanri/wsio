@@ -32,7 +32,7 @@ impl<T: Eq + Into<u8> + PartialEq + TryFrom<u8>> AtomicStatus<T> {
     pub fn ensure<F: FnOnce(T) -> String>(&self, expected: T, message: F) -> Result<()> {
         let status = self.get();
         if status != expected {
-            bail!("{}", message(status));
+            bail!(message(status));
         }
 
         Ok(())

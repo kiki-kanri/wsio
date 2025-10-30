@@ -94,7 +94,7 @@ impl WsIoServerNamespaceBroadcastOperator {
 
     pub async fn emit<D: Serialize>(&self, event: impl AsRef<str>, data: Option<&D>) -> Result<()> {
         self.namespace.status.ensure(NamespaceStatus::Running, |status| {
-            format!("Cannot emit in invalid status: {:#?}", status)
+            format!("Cannot emit in invalid status: {status:?}")
         })?;
 
         let message = self.namespace.encode_packet_to_message(&WsIoPacket::new_event(

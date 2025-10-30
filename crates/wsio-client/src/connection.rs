@@ -118,7 +118,7 @@ impl WsIoClientConnection {
         let status = self.status.get();
         match status {
             ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
-            _ => bail!("Received init packet in invalid status: {:#?}", status),
+            _ => bail!("Received init packet in invalid status: {status:?}"),
         }
 
         // Abort init-timeout task if still active
@@ -157,7 +157,7 @@ impl WsIoClientConnection {
         let status = self.status.get();
         match status {
             ConnectionStatus::AwaitingReady => self.status.try_transition(status, ConnectionStatus::Ready)?,
-            _ => bail!("Received ready packet in invalid status: {:#?}", status),
+            _ => bail!("Received ready packet in invalid status: {status:?}"),
         }
 
         // Abort ready-timeout task if still active
@@ -222,7 +222,7 @@ impl WsIoClientConnection {
 
     pub(crate) async fn emit_event_message(&self, message: Arc<Message>) -> Result<()> {
         self.status.ensure(ConnectionStatus::Ready, |status| {
-            format!("Cannot emit event message in invalid status: {:#?}", status)
+            format!("Cannot emit event message in invalid status: {status:?}")
         })?;
 
         self.send_message(message).await

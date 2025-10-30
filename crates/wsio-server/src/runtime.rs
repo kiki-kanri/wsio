@@ -68,7 +68,7 @@ impl WsIoServerRuntime {
 
     pub(crate) async fn emit<D: Serialize>(&self, event: &str, data: Option<&D>) -> Result<()> {
         self.status.ensure(WsIoServerRuntimeStatus::Running, |status| {
-            format!("Cannot emit in invalid status: {:#?}", status)
+            format!("Cannot emit in invalid status: {status:?}",)
         })?;
 
         join_all(

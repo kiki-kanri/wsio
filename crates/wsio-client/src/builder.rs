@@ -39,7 +39,7 @@ impl WsIoClientBuilder {
         query_pairs.push(("namespace".into(), Self::normalize_url_path(url.path()).into()));
         let query = query_pairs
             .iter()
-            .map(|(k, v)| format!("{}={}", k, v))
+            .map(|(k, v)| format!("{k}={v}"))
             .collect::<Vec<_>>()
             .join("&");
 

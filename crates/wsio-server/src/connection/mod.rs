@@ -153,7 +153,7 @@ impl WsIoServerConnection {
         let status = self.status.get();
         match status {
             ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
-            _ => bail!("Received init packet in invalid status: {:#?}", status),
+            _ => bail!("Received init packet in invalid status: {status:?}"),
         }
 
         // Abort init-timeout task if still active
@@ -182,7 +182,7 @@ impl WsIoServerConnection {
 
             // Ensure connection is still in Activating state
             self.status.ensure(ConnectionStatus::Activating, |status| {
-                format!("Cannot activate connection in invalid status: {:#?}", status)
+                format!("Cannot activate connection in invalid status: {status:?}")
             })?;
         }
 
@@ -268,7 +268,7 @@ impl WsIoServerConnection {
 
     pub(crate) async fn emit_event_message(&self, message: Arc<Message>) -> Result<()> {
         self.status.ensure(ConnectionStatus::Ready, |status| {
-            format!("Cannot emit in invalid status: {:#?}", status)
+            format!("Cannot emit in invalid status: {status:?}")
         })?;
 
         self.send_message(message).await
@@ -293,7 +293,7 @@ impl WsIoServerConnection {
     pub(crate) async fn init(self: &Arc<Self>) -> Result<()> {
         // Verify current state; only valid Created
         self.status.ensure(ConnectionStatus::Created, |status| {
-            format!("Cannot init connection in invalid status: {:#?}", status)
+            format!("Cannot init connection in invalid status: {status:?}")
         })?;
 
         // Generate init request data if init request handler is configured
