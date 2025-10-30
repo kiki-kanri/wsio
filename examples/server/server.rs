@@ -74,14 +74,6 @@ async fn main() -> Result<()> {
     let _ = init_tracing_with_local_time_format();
     tracing::info!("pid: {}", id());
 
-    // Register /auth namespace
-    WS_IO_SERVER
-        .new_namespace_builder("/auth")?
-        .on_connect(on_connect)
-        .on_ready(on_ready)
-        .with_auth(|_, _: &()| async { Ok(()) })
-        .register()?;
-
     // Register /bincode namespace
     WS_IO_SERVER
         .new_namespace_builder("/bincode")?
@@ -105,6 +97,15 @@ async fn main() -> Result<()> {
             connection.disconnect().await;
             Ok(())
         })
+        .register()?;
+
+    // Register /init namespace
+    WS_IO_SERVER
+        .new_namespace_builder("/init")?
+        .on_connect(on_connect)
+        .on_ready(on_ready)
+        .with_init_request(|_| async { Ok(Some(())) })
+        .with_init_response(|_, _: Option<()>| async { Ok(()) })
         .register()?;
 
     // Register /msgpack namespace
@@ -144,7 +145,7 @@ async fn main() -> Result<()> {
     let app = Router::new().layer(ws_io_layer);
     let listener = TcpListener::bind(("127.0.0.1", 8000)).await?;
     tracing::info!("Listening on {}", listener.local_addr().unwrap());
-    MAIN_TASK_MANAGER.spawn_with_token(async move |token| {
+    MAIN_TASK_MANAGER.spawn_with_token(async |token| {
         tracing::info!("Started");
         let _ = serve(listener, app)
             .with_graceful_shutdown(async move { token.cancelled().await })
