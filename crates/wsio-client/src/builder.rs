@@ -34,7 +34,16 @@ impl WsIoClientBuilder {
             bail!("Invalid URL scheme: {}", url.scheme());
         }
 
-        url.set_query(Some(&format!("namespace={}", Self::normalize_url_path(url.path()))));
+        let mut query_pairs = url.query_pairs().collect::<Vec<_>>();
+        query_pairs.retain(|(k, _)| k != "namespace");
+        query_pairs.push(("namespace".into(), Self::normalize_url_path(url.path()).into()));
+        let query = query_pairs
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        url.set_query(Some(&query));
         url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
