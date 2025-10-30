@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::Result;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-use url::Url;
 
 use crate::{
     connection::WsIoClientConnection,
@@ -36,8 +35,6 @@ pub(crate) struct WsIoClientConfig {
 
     /// Maximum duration allowed for the auth handler to execute.
     pub(crate) auth_handler_timeout: Duration,
-
-    pub(crate) connect_url: Url,
 
     /// Maximum duration to wait for the client to send the init packet.
     pub(crate) init_packet_timeout: Duration,

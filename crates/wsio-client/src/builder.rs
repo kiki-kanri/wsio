@@ -22,6 +22,7 @@ use crate::{
 // Structs
 pub struct WsIoClientBuilder {
     config: WsIoClientConfig,
+    connect_url: Url,
 }
 
 impl WsIoClientBuilder {
@@ -30,32 +31,12 @@ impl WsIoClientBuilder {
             bail!("Invalid URL scheme: {}", url.scheme());
         }
 
-        let namespace = {
-            let path = url.path().trim_matches('/');
-            let mut normalized = String::new();
-            let mut last_slash = false;
-            for char in path.chars() {
-                if char == '/' {
-                    if !last_slash {
-                        normalized.push('/');
-                        last_slash = true;
-                    }
-                } else {
-                    normalized.push(char);
-                    last_slash = false;
-                }
-            }
-
-            normalized
-        };
-
-        url.set_query(Some(&format!("namespace=/{namespace}")));
+        url.set_query(Some(&format!("namespace={}", Self::normalize_url_path(url.path()))));
         url.set_path("ws.io");
         Ok(Self {
             config: WsIoClientConfig {
                 auth_handler: None,
                 auth_handler_timeout: Duration::from_secs(3),
-                connect_url: url,
                 init_packet_timeout: Duration::from_secs(3),
                 on_connection_close_handler: None,
                 on_connection_close_handler_timeout: Duration::from_secs(2),
@@ -70,7 +51,16 @@ impl WsIoClientBuilder {
                     .read_buffer_size(8 * 1024)
                     .write_buffer_size(8 * 1024),
             },
+            connect_url: url,
         })
+    }
+
+    // Private methods
+    fn normalize_url_path(path: &str) -> String {
+        format!(
+            "/{}",
+            path.split('/').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("/")
+        )
     }
 
     // Public methods
@@ -95,7 +85,7 @@ impl WsIoClientBuilder {
     }
 
     pub fn build(self) -> WsIoClient {
-        WsIoClient(WsIoClientRuntime::new(self.config))
+        WsIoClient(WsIoClientRuntime::new(self.config, self.connect_url))
     }
 
     pub fn init_packet_timeout(mut self, duration: Duration) -> Self {
@@ -142,7 +132,9 @@ impl WsIoClientBuilder {
     }
 
     pub fn request_path(mut self, request_path: impl AsRef<str>) -> Self {
-        self.config.connect_url.set_path(request_path.as_ref());
+        self.connect_url
+            .set_path(&Self::normalize_url_path(request_path.as_ref()));
+
         self
     }
 

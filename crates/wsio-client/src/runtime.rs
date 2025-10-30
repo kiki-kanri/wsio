@@ -37,6 +37,7 @@ use tokio_tungstenite::{
     tungstenite::Message,
 };
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
 use crate::{
     config::WsIoClientConfig,
@@ -63,6 +64,7 @@ enum RuntimeStatus {
 pub(crate) struct WsIoClientRuntime {
     cancel_token: ArcSwap<CancellationToken>,
     pub(crate) config: WsIoClientConfig,
+    connect_url: Url,
     connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
     pub(crate) event_message_flush_notify: Notify,
@@ -83,12 +85,13 @@ impl TaskSpawner for WsIoClientRuntime {
 }
 
 impl WsIoClientRuntime {
-    pub(crate) fn new(config: WsIoClientConfig) -> Arc<Self> {
+    pub(crate) fn new(config: WsIoClientConfig, connect_url: Url) -> Arc<Self> {
         let channel_capacity = channel_capacity_from_websocket_config(&config.websocket_config);
         let (event_message_send_tx, event_message_send_rx) = channel(channel_capacity);
         Arc::new(Self {
             cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
             config,
+            connect_url,
             connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             event_message_flush_notify: Notify::new(),
@@ -104,12 +107,8 @@ impl WsIoClientRuntime {
 
     // Private methods
     async fn run_connection(self: &Arc<Self>) -> Result<()> {
-        let (ws_stream, _) = connect_async_with_config(
-            self.config.connect_url.as_str(),
-            Some(self.config.websocket_config),
-            false,
-        )
-        .await?;
+        let (ws_stream, _) =
+            connect_async_with_config(self.connect_url.as_str(), Some(self.config.websocket_config), false).await?;
 
         let (connection, mut message_rx) = WsIoClientConnection::new(self.clone());
         connection.init().await;
