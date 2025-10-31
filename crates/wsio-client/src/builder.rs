@@ -17,9 +17,9 @@ use url::Url;
 use crate::{
     WsIoClient,
     config::WsIoClientConfig,
-    connection::WsIoClientConnection,
     core::packet::codecs::WsIoPacketCodec,
     runtime::WsIoClientRuntime,
+    session::WsIoClientSession,
 };
 
 // Structs
@@ -50,12 +50,12 @@ impl WsIoClientBuilder {
                 init_handler: None,
                 init_handler_timeout: Duration::from_secs(3),
                 init_packet_timeout: Duration::from_secs(3),
-                on_connection_close_handler: None,
-                on_connection_close_handler_timeout: Duration::from_secs(2),
-                on_connection_ready_handler: None,
+                on_session_close_handler: None,
+                on_session_close_handler_timeout: Duration::from_secs(2),
+                on_session_ready_handler: None,
                 packet_codec: WsIoPacketCodec::SerdeJson,
                 ready_packet_timeout: Duration::from_secs(3),
-                reconnection_delay: Duration::from_secs(1),
+                reconnect_delay: Duration::from_secs(1),
                 websocket_config: WebSocketConfig::default()
                     .max_frame_size(Some(8 * 1024 * 1024))
                     .max_message_size(Some(16 * 1024 * 1024))
@@ -90,26 +90,26 @@ impl WsIoClientBuilder {
         self
     }
 
-    pub fn on_connection_close<H, Fut>(mut self, handler: H) -> Self
+    pub fn on_session_close<H, Fut>(mut self, handler: H) -> Self
     where
-        H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientSession>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.config.on_connection_close_handler = Some(Box::new(move |connection| Box::pin(handler(connection))));
+        self.config.on_session_close_handler = Some(Box::new(move |session| Box::pin(handler(session))));
         self
     }
 
-    pub fn on_connection_close_handler_timeout(mut self, duration: Duration) -> Self {
-        self.config.on_connection_close_handler_timeout = duration;
+    pub fn on_session_close_handler_timeout(mut self, duration: Duration) -> Self {
+        self.config.on_session_close_handler_timeout = duration;
         self
     }
 
-    pub fn on_connection_ready<H, Fut>(mut self, handler: H) -> Self
+    pub fn on_session_ready<H, Fut>(mut self, handler: H) -> Self
     where
-        H: Fn(Arc<WsIoClientConnection>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientSession>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.config.on_connection_ready_handler = Some(Arc::new(move |connection| Box::pin(handler(connection))));
+        self.config.on_session_ready_handler = Some(Arc::new(move |session| Box::pin(handler(session))));
         self
     }
 
@@ -123,8 +123,8 @@ impl WsIoClientBuilder {
         self
     }
 
-    pub fn reconnection_delay(mut self, delay: Duration) -> Self {
-        self.config.reconnection_delay = delay;
+    pub fn reconnect_delay(mut self, delay: Duration) -> Self {
+        self.config.reconnect_delay = delay;
         self
     }
 
@@ -147,22 +147,19 @@ impl WsIoClientBuilder {
 
     pub fn with_init_handler<H, Fut, D, R>(mut self, handler: H) -> WsIoClientBuilder
     where
-        H: Fn(Arc<WsIoClientConnection>, Option<D>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientSession>, Option<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Option<R>>> + Send + 'static,
         D: DeserializeOwned + Send + 'static,
         R: Serialize + Send + 'static,
     {
         let handler = Arc::new(handler);
-        self.config.init_handler = Some(Box::new(move |connection, bytes, packet_codec| {
+        self.config.init_handler = Some(Box::new(move |session, bytes, packet_codec| {
             let handler = handler.clone();
             Box::pin(async move {
-                handler(
-                    connection,
-                    bytes.map(|bytes| packet_codec.decode_data(bytes)).transpose()?,
-                )
-                .await?
-                .map(|data| packet_codec.encode_data(&data))
-                .transpose()
+                handler(session, bytes.map(|bytes| packet_codec.decode_data(bytes)).transpose()?)
+                    .await?
+                    .map(|data| packet_codec.encode_data(&data))
+                    .transpose()
             })
         }));
 

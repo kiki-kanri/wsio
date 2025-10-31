@@ -46,7 +46,7 @@ use crate::{
 // Enums
 #[repr(u8)]
 #[derive(Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
-enum ConnectionStatus {
+enum SessionStatus {
     AwaitingInit,
     AwaitingReady,
     Closed,
@@ -58,23 +58,23 @@ enum ConnectionStatus {
 }
 
 // Structs
-pub struct WsIoClientConnection {
+pub struct WsIoClientSession {
     cancel_token: ArcSwap<CancellationToken>,
     init_timeout_task: Mutex<Option<JoinHandle<()>>>,
     message_tx: Sender<Arc<Message>>,
     ready_timeout_task: Mutex<Option<JoinHandle<()>>>,
     runtime: Arc<WsIoClientRuntime>,
-    status: AtomicStatus<ConnectionStatus>,
+    status: AtomicStatus<SessionStatus>,
 }
 
-impl TaskSpawner for WsIoClientConnection {
+impl TaskSpawner for WsIoClientSession {
     #[inline]
     fn cancel_token(&self) -> Arc<CancellationToken> {
         self.cancel_token.load_full()
     }
 }
 
-impl WsIoClientConnection {
+impl WsIoClientSession {
     #[inline]
     pub(crate) fn new(runtime: Arc<WsIoClientRuntime>) -> (Arc<Self>, Receiver<Arc<Message>>) {
         let channel_capacity = channel_capacity_from_websocket_config(&runtime.config.websocket_config);
@@ -86,7 +86,7 @@ impl WsIoClientConnection {
                 message_tx,
                 ready_timeout_task: Mutex::new(None),
                 runtime,
-                status: AtomicStatus::new(ConnectionStatus::Created),
+                status: AtomicStatus::new(SessionStatus::Created),
             }),
             message_rx,
         )
@@ -117,7 +117,7 @@ impl WsIoClientConnection {
         // Verify current state; only valid from AwaitingInit → Initiating
         let status = self.status.get();
         match status {
-            ConnectionStatus::AwaitingInit => self.status.try_transition(status, ConnectionStatus::Initiating)?,
+            SessionStatus::AwaitingInit => self.status.try_transition(status, SessionStatus::Initiating)?,
             _ => bail!("Received init packet in invalid status: {status:?}"),
         }
 
@@ -137,14 +137,14 @@ impl WsIoClientConnection {
 
         // Transition state to AwaitingReady
         self.status
-            .try_transition(ConnectionStatus::Initiating, ConnectionStatus::AwaitingReady)?;
+            .try_transition(SessionStatus::Initiating, SessionStatus::AwaitingReady)?;
 
-        // Spawn ready-timeout watchdog to close connection if Ready is not received in time
-        let connection = self.clone();
+        // Spawn ready-timeout watchdog to close session if Ready is not received in time
+        let session = self.clone();
         *self.ready_timeout_task.lock().await = Some(spawn(async move {
-            sleep(connection.runtime.config.ready_packet_timeout).await;
-            if connection.status.is(ConnectionStatus::AwaitingReady) {
-                connection.close();
+            sleep(session.runtime.config.ready_packet_timeout).await;
+            if session.status.is(SessionStatus::AwaitingReady) {
+                session.close();
             }
         }));
 
@@ -156,7 +156,7 @@ impl WsIoClientConnection {
         // Verify current state; only valid from AwaitingReady → Ready
         let status = self.status.get();
         match status {
-            ConnectionStatus::AwaitingReady => self.status.try_transition(status, ConnectionStatus::Ready)?,
+            SessionStatus::AwaitingReady => self.status.try_transition(status, SessionStatus::Ready)?,
             _ => bail!("Received ready packet in invalid status: {status:?}"),
         }
 
@@ -166,10 +166,10 @@ impl WsIoClientConnection {
         // Wake event message flush task
         self.runtime.event_message_flush_notify.notify_waiters();
 
-        // Invoke on_connection_ready handler if configured
-        if let Some(on_connection_ready_handler) = self.runtime.config.on_connection_ready_handler.clone() {
+        // Invoke on_session_ready handler if configured
+        if let Some(on_session_ready_handler) = self.runtime.config.on_session_ready_handler.clone() {
             // Run handler asynchronously in a detached task
-            self.spawn_task(on_connection_ready_handler(self.clone()));
+            self.spawn_task(on_session_ready_handler(self.clone()));
         }
 
         Ok(())
@@ -185,8 +185,8 @@ impl WsIoClientConnection {
 
     // Protected methods
     pub(crate) async fn cleanup(self: &Arc<Self>) {
-        // Set connection state to Closing
-        self.status.store(ConnectionStatus::Closing);
+        // Set state to Closing
+        self.status.store(SessionStatus::Closing);
 
         // Abort timeout tasks if still active
         abort_locked_task(&self.init_timeout_task).await;
@@ -195,25 +195,25 @@ impl WsIoClientConnection {
         // Cancel all ongoing operations via cancel token
         self.cancel_token.load().cancel();
 
-        // Invoke on_connection_close handler with timeout protection if configured
-        if let Some(on_connection_close_handler) = &self.runtime.config.on_connection_close_handler {
+        // Invoke on_session_close handler with timeout protection if configured
+        if let Some(on_session_close_handler) = &self.runtime.config.on_session_close_handler {
             let _ = timeout(
-                self.runtime.config.on_connection_close_handler_timeout,
-                on_connection_close_handler(self.clone()),
+                self.runtime.config.on_session_close_handler_timeout,
+                on_session_close_handler(self.clone()),
             )
             .await;
         }
 
-        // Set connection state to Closed
-        self.status.store(ConnectionStatus::Closed);
+        // Set state to Closed
+        self.status.store(SessionStatus::Closed);
     }
 
     #[inline]
     pub(crate) fn close(&self) {
-        // Skip if connection is already Closing or Closed, otherwise set connection state to Closing
+        // Skip if session is already Closing or Closed, otherwise set state to Closing
         match self.status.get() {
-            ConnectionStatus::Closed | ConnectionStatus::Closing => return,
-            _ => self.status.store(ConnectionStatus::Closing),
+            SessionStatus::Closed | SessionStatus::Closing => return,
+            _ => self.status.store(SessionStatus::Closing),
         }
 
         // Send websocket close frame to initiate graceful shutdown
@@ -221,7 +221,7 @@ impl WsIoClientConnection {
     }
 
     pub(crate) async fn emit_event_message(&self, message: Arc<Message>) -> Result<()> {
-        self.status.ensure(ConnectionStatus::Ready, |status| {
+        self.status.ensure(SessionStatus::Ready, |status| {
             format!("Cannot emit event message in invalid status: {status:?}")
         })?;
 
@@ -246,12 +246,12 @@ impl WsIoClientConnection {
     }
 
     pub(crate) async fn init(self: &Arc<Self>) {
-        self.status.store(ConnectionStatus::AwaitingInit);
-        let connection = self.clone();
+        self.status.store(SessionStatus::AwaitingInit);
+        let session = self.clone();
         *self.init_timeout_task.lock().await = Some(spawn(async move {
-            sleep(connection.runtime.config.init_packet_timeout).await;
-            if connection.status.is(ConnectionStatus::AwaitingInit) {
-                connection.close();
+            sleep(session.runtime.config.init_packet_timeout).await;
+            if session.status.is(SessionStatus::AwaitingInit) {
+                session.close();
             }
         }));
     }

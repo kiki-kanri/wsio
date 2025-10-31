@@ -41,7 +41,6 @@ use url::Url;
 
 use crate::{
     config::WsIoClientConfig,
-    connection::WsIoClientConnection,
     core::{
         atomic::status::AtomicStatus,
         channel_capacity_from_websocket_config,
@@ -49,6 +48,7 @@ use crate::{
         packet::WsIoPacket,
         traits::task::spawner::TaskSpawner,
     },
+    session::WsIoClientSession,
 };
 
 // Enums
@@ -65,14 +65,14 @@ pub(crate) struct WsIoClientRuntime {
     cancel_token: ArcSwap<CancellationToken>,
     pub(crate) config: WsIoClientConfig,
     connect_url: Url,
-    connection: ArcSwapOption<WsIoClientConnection>,
     connection_loop_task: Mutex<Option<JoinHandle<()>>>,
     pub(crate) event_message_flush_notify: Notify,
     event_message_flush_task: Mutex<Option<JoinHandle<()>>>,
     event_message_send_rx: Mutex<Receiver<Arc<Message>>>,
     event_message_send_tx: Sender<Arc<Message>>,
-    pub(crate) event_registry: WsIoEventRegistry<WsIoClientConnection, WsIoClientRuntime>,
+    pub(crate) event_registry: WsIoEventRegistry<WsIoClientSession, WsIoClientRuntime>,
     operate_lock: Mutex<()>,
+    session: ArcSwapOption<WsIoClientSession>,
     status: AtomicStatus<RuntimeStatus>,
     wake_reconnect_wait_notify: Notify,
 }
@@ -92,7 +92,6 @@ impl WsIoClientRuntime {
             cancel_token: ArcSwap::new(Arc::new(CancellationToken::new())),
             config,
             connect_url,
-            connection: ArcSwapOption::new(None),
             connection_loop_task: Mutex::new(None),
             event_message_flush_notify: Notify::new(),
             event_message_flush_task: Mutex::new(None),
@@ -100,6 +99,7 @@ impl WsIoClientRuntime {
             event_message_send_tx,
             event_registry: WsIoEventRegistry::new(),
             operate_lock: Mutex::new(()),
+            session: ArcSwapOption::new(None),
             status: AtomicStatus::new(RuntimeStatus::Stopped),
             wake_reconnect_wait_notify: Notify::new(),
         })
@@ -110,17 +110,17 @@ impl WsIoClientRuntime {
         let (ws_stream, _) =
             connect_async_with_config(self.connect_url.as_str(), Some(self.config.websocket_config), false).await?;
 
-        let (connection, mut message_rx) = WsIoClientConnection::new(self.clone());
-        connection.init().await;
+        let (session, mut message_rx) = WsIoClientSession::new(self.clone());
+        session.init().await;
 
         let (mut ws_stream_writer, mut ws_stream_reader) = ws_stream.split();
-        let connection_clone = connection.clone();
+        let session_clone = session.clone();
         let mut read_ws_stream_task = spawn(async move {
             while let Some(message) = ws_stream_reader.next().await {
                 if match message {
-                    Ok(Message::Binary(bytes)) => connection_clone.handle_incoming_packet(&bytes).await,
+                    Ok(Message::Binary(bytes)) => session_clone.handle_incoming_packet(&bytes).await,
                     Ok(Message::Close(_)) => break,
-                    Ok(Message::Text(text)) => connection_clone.handle_incoming_packet(text.as_bytes()).await,
+                    Ok(Message::Text(text)) => session_clone.handle_incoming_packet(text.as_bytes()).await,
                     Err(_) => break,
                     _ => Ok(()),
                 }
@@ -146,7 +146,7 @@ impl WsIoClientRuntime {
             }
         });
 
-        self.connection.store(Some(connection.clone()));
+        self.session.store(Some(session.clone()));
         select! {
             _ = &mut read_ws_stream_task => {
                 write_ws_stream_task.abort();
@@ -156,8 +156,8 @@ impl WsIoClientRuntime {
             },
         }
 
-        self.connection.store(None);
-        connection.cleanup().await;
+        self.session.store(None);
+        session.cleanup().await;
         Ok(())
     }
 
@@ -186,7 +186,7 @@ impl WsIoClientRuntime {
                         _ = runtime.wake_reconnect_wait_notify.notified() => {
                             break;
                         },
-                        _ = sleep(runtime.config.reconnection_delay) => {},
+                        _ = sleep(runtime.config.reconnect_delay) => {},
                     }
                 } else {
                     break;
@@ -200,8 +200,8 @@ impl WsIoClientRuntime {
             let mut event_message_send_rx = runtime.event_message_send_rx.lock().await;
             while let Some(message) = event_message_send_rx.recv().await {
                 loop {
-                    if let Some(connection) = runtime.connection.load().as_ref()
-                        && connection.emit_event_message(message.clone()).await.is_ok()
+                    if let Some(session) = runtime.session.load().as_ref()
+                        && session.emit_event_message(message.clone()).await.is_ok()
                     {
                         break;
                     }
@@ -238,9 +238,9 @@ impl WsIoClientRuntime {
         // Wake reconnect loop to break out of sleep early
         self.wake_reconnect_wait_notify.notify_waiters();
 
-        // Close connection
-        if let Some(connection) = self.connection.load().as_ref() {
-            connection.close();
+        // Close session
+        if let Some(session) = self.session.load().as_ref() {
+            session.close();
         }
 
         // Await connection loop task termination
@@ -291,7 +291,7 @@ impl WsIoClientRuntime {
     #[inline]
     pub(crate) fn on<H, Fut, D>(&self, event: &str, handler: H) -> u32
     where
-        H: Fn(Arc<WsIoClientConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientSession>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {

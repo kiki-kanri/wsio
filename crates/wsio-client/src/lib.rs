@@ -14,14 +14,14 @@ pub use wsio_core as core;
 
 mod builder;
 mod config;
-pub mod connection;
 mod runtime;
+pub mod session;
 
 use crate::{
     builder::WsIoClientBuilder,
-    connection::WsIoClientConnection,
     core::traits::task::spawner::TaskSpawner,
     runtime::WsIoClientRuntime,
+    session::WsIoClientSession,
 };
 
 // Structs
@@ -72,7 +72,7 @@ impl WsIoClient {
     #[inline]
     pub fn on<H, Fut, D>(&self, event: impl AsRef<str>, handler: H) -> u32
     where
-        H: Fn(Arc<WsIoClientConnection>, Arc<D>) -> Fut + Send + Sync + 'static,
+        H: Fn(Arc<WsIoClientSession>, Arc<D>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         D: DeserializeOwned + Send + Sync + 'static,
     {

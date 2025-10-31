@@ -8,7 +8,6 @@ use anyhow::Result;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::{
-    connection::WsIoClientConnection,
     core::{
         packet::codecs::WsIoPacketCodec,
         types::{
@@ -16,12 +15,13 @@ use crate::{
             BoxAsyncUnaryResultHandler,
         },
     },
+    session::WsIoClientSession,
 };
 
 // Types
 type InitHandler = Box<
     dyn for<'a> Fn(
-            Arc<WsIoClientConnection>,
+            Arc<WsIoClientSession>,
             Option<&'a [u8]>,
             &'a WsIoPacketCodec,
         ) -> Pin<Box<dyn Future<Output = Result<Option<Vec<u8>>>> + Send + 'a>>
@@ -40,19 +40,19 @@ pub(crate) struct WsIoClientConfig {
     /// Maximum duration to wait for the server to send the init packet.
     pub(crate) init_packet_timeout: Duration,
 
-    pub(crate) on_connection_close_handler: Option<BoxAsyncUnaryResultHandler<WsIoClientConnection>>,
+    pub(crate) on_session_close_handler: Option<BoxAsyncUnaryResultHandler<WsIoClientSession>>,
 
-    /// Maximum duration allowed for the on_connection_close handler to execute.
-    pub(crate) on_connection_close_handler_timeout: Duration,
+    /// Maximum duration allowed for the on_session_close handler to execute.
+    pub(crate) on_session_close_handler_timeout: Duration,
 
-    pub(crate) on_connection_ready_handler: Option<ArcAsyncUnaryResultHandler<WsIoClientConnection>>,
+    pub(crate) on_session_ready_handler: Option<ArcAsyncUnaryResultHandler<WsIoClientSession>>,
 
     pub(crate) packet_codec: WsIoPacketCodec,
 
     /// Maximum duration to wait for the client to send the ready packet.
     pub(crate) ready_packet_timeout: Duration,
 
-    pub(crate) reconnection_delay: Duration,
+    pub(crate) reconnect_delay: Duration,
 
     pub(crate) websocket_config: WebSocketConfig,
 }
