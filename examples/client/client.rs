@@ -11,7 +11,7 @@ use kikiutils::{
 use tokio::join;
 use wsio_client::{
     WsIoClient,
-    connection::WsIoClientConnection,
+    session::WsIoClientSession,
     core::packet::codecs::WsIoPacketCodec,
 };
 
@@ -20,8 +20,8 @@ static BINCODE: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/bincode";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::Bincode)
         .build();
 
@@ -33,8 +33,8 @@ static CBOR: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/cbor";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::Cbor)
         .build();
 
@@ -46,8 +46,8 @@ static DISCONNECT: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/disconnect";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .build();
 
     client.on("test", |_, _: Arc<()>| on_event(NAMESPACE));
@@ -58,8 +58,8 @@ static MSG_PACK: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/msgpack";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::MsgPack)
         .build();
 
@@ -71,8 +71,8 @@ static INIT: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/init";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .with_init_handler(|_, _: Option<()>| async { Ok(Some(())) })
         .build();
 
@@ -84,8 +84,8 @@ static POSTCARD: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/postcard";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::Postcard)
         .build();
 
@@ -97,8 +97,8 @@ static SERDE_JSON: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/serde-json";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::SerdeJson)
         .build();
 
@@ -110,8 +110,8 @@ static SONIC_RS: LazyLock<WsIoClient> = LazyLock::new(|| {
     const NAMESPACE: &str = "/sonic-rs";
     let client = WsIoClient::builder(format!("ws://127.0.0.1:8000/{NAMESPACE}").as_str())
         .unwrap()
-        .on_connection_close(|connection| on_connection_close(connection, NAMESPACE))
-        .on_connection_ready(|connection| on_connection_ready(connection, NAMESPACE))
+        .on_session_close(|session| on_session_close(session, NAMESPACE))
+        .on_session_ready(|session| on_session_ready(session, NAMESPACE))
         .packet_codec(WsIoPacketCodec::SonicRs)
         .build();
 
@@ -120,13 +120,13 @@ static SONIC_RS: LazyLock<WsIoClient> = LazyLock::new(|| {
 });
 
 // Functions
-async fn on_connection_close(_: Arc<WsIoClientConnection>, namespace: &str) -> Result<()> {
-    tracing::info!("{namespace}: on_connection_close");
+async fn on_session_close(_: Arc<WsIoClientSession>, namespace: &str) -> Result<()> {
+    tracing::info!("{namespace}: on_session_close");
     Ok(())
 }
 
-async fn on_connection_ready(_: Arc<WsIoClientConnection>, namespace: &str) -> Result<()> {
-    tracing::info!("{namespace}: on_connection_ready");
+async fn on_session_ready(_: Arc<WsIoClientSession>, namespace: &str) -> Result<()> {
+    tracing::info!("{namespace}: on_session_ready");
     Ok(())
 }
 

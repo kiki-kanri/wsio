@@ -14,14 +14,14 @@ use wsio_client::{
 };
 
 // Constants/Statics
+const CLIENT_COUNT: usize = 10000;
 const CONNECT_CONCURRENCY: usize = 1000;
-const CONNECTION_COUNT: usize = 10000;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let sem = Arc::new(Semaphore::new(CONNECT_CONCURRENCY));
-    let mut handles = Vec::with_capacity(CONNECTION_COUNT);
-    for i in 0..CONNECTION_COUNT {
+    let mut handles = Vec::with_capacity(CLIENT_COUNT);
+    for i in 0..CLIENT_COUNT {
         let permit = sem.clone().acquire_owned().await?;
         handles.push(tokio::spawn(async move {
             let client = WsIoClient::builder("ws://127.0.0.1:8000/bincode")
