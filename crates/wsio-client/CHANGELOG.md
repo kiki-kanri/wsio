@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.6.0...wsio-client-v0.7.0) - 2025-10-31 16:59
+
+### 💅 Refactors
+
+- *(client)* [**breaking**] rename `connection` to `session` and `reconnection_delay` config to `reconnect_delay` ([fb4e96c](https://github.com/ws-io/ws.io-rs/commit/fb4e96c))
+
 ## [0.6.0](https://github.com/ws-io/ws.io-rs/compare/wsio-client-v0.5.1...wsio-client-v0.6.0) - 2025-10-30 12:55
 
 ### 🎨 Styles
