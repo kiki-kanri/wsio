@@ -1,0 +1,16 @@
+[workspace]
+members = [
+  "crates/*",
+]
+
+resolver = "3"
+
+[workspace.package]
+authors = []
+categories = []
+description = ""
+edition = "2024"
+homepage = ""
+keywords = []
+license = "MIT"
+repository = ""
