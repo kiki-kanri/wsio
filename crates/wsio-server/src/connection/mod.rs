@@ -65,7 +65,10 @@ use crate::{
         },
         utils::task::abort_locked_task,
     },
-    namespace::WsIoServerNamespace,
+    namespace::{
+        WsIoServerNamespace,
+        operators::broadcast::WsIoServerNamespaceBroadcastOperator,
+    },
 };
 
 // Enums
@@ -345,6 +348,14 @@ impl WsIoServerConnection {
         .await
     }
 
+    #[inline]
+    pub fn except<I: IntoIterator<Item = S>, S: AsRef<str>>(
+        self: &Arc<Self>,
+        room_names: I,
+    ) -> WsIoServerNamespaceBroadcastOperator {
+        self.namespace.except(room_names).except_connection_ids(vec![self.id])
+    }
+
     #[cfg(feature = "connection-extensions")]
     #[inline]
     pub fn extensions(&self) -> &ConnectionExtensions {
@@ -421,6 +432,14 @@ impl WsIoServerConnection {
     #[inline]
     pub fn server(&self) -> WsIoServer {
         self.namespace.server()
+    }
+
+    #[inline]
+    pub fn to<I: IntoIterator<Item = S>, S: AsRef<str>>(
+        self: &Arc<Self>,
+        room_names: I,
+    ) -> WsIoServerNamespaceBroadcastOperator {
+        self.namespace.to(room_names).except_connection_ids(vec![self.id])
     }
 }
 

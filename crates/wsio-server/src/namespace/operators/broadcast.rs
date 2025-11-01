@@ -25,6 +25,7 @@ use crate::{
 
 // Structs
 pub struct WsIoServerNamespaceBroadcastOperator {
+    exclude_connection_ids: HashSet<u64>,
     exclude_rooms: HashSet<String>,
     include_rooms: HashSet<String>,
     namespace: Arc<WsIoServerNamespace>,
@@ -34,6 +35,7 @@ impl WsIoServerNamespaceBroadcastOperator {
     #[inline]
     pub(in super::super) fn new(namespace: Arc<WsIoServerNamespace>) -> Self {
         Self {
+            exclude_connection_ids: HashSet::new(),
             exclude_rooms: HashSet::new(),
             include_rooms: HashSet::new(),
             namespace,
@@ -63,6 +65,10 @@ impl WsIoServerNamespaceBroadcastOperator {
                     target_connection_ids.remove(&entry);
                 }
             }
+        }
+
+        for exclude_connection_id in &self.exclude_connection_ids {
+            target_connection_ids.remove(&exclude_connection_id);
         }
 
         iter(target_connection_ids)
@@ -117,6 +123,11 @@ impl WsIoServerNamespaceBroadcastOperator {
         self.exclude_rooms
             .extend(room_names.into_iter().map(|room_name| room_name.as_ref().to_string()));
 
+        self
+    }
+
+    pub fn except_connection_ids<I: IntoIterator<Item = u64>>(mut self, connection_ids: I) -> Self {
+        self.exclude_connection_ids.extend(connection_ids);
         self
     }
 
