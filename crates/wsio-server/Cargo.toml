@@ -18,6 +18,7 @@ license.workspace = true
 readme = "./README.md"
 repository.workspace = true
 
+# Dependencies
 [dependencies]
 anyhow = "1.0.100"
 arc-swap = "1.7.1"
@@ -37,17 +38,22 @@ tower-service = { version = "0.3.3", optional = true }
 wsio-core = { path = "../wsio-core", version = "0.7.0" }
 url = "2.5.7"
 
+# Features
 [features]
-default = []
-
+## Define features
 connection-extensions = []
 packet-codec-bincode = ["wsio-core/packet-codec-bincode"]
 packet-codec-cbor = ["wsio-core/packet-codec-cbor"]
 packet-codec-msgpack = ["wsio-core/packet-codec-msgpack"]
 packet-codec-postcard = ["wsio-core/packet-codec-postcard"]
 packet-codec-sonic-rs = ["wsio-core/packet-codec-sonic-rs"]
-tower = ["dep:tower-layer", "dep:tower-service"]
+tower = [
+  "dep:tower-layer",
+  "dep:tower-service",
+]
 
+## Default and alias
+default = []
 all = [
   "connection-extensions",
   "packet-codec-bincode",

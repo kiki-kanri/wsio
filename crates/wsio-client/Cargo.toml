@@ -18,6 +18,7 @@ license.workspace = true
 readme = "./README.md"
 repository.workspace = true
 
+# Dependencies
 [dependencies]
 anyhow = "1.0.100"
 arc-swap = "1.7.1"
@@ -30,21 +31,23 @@ tokio-util = "0.7.16"
 url = "2.5.7"
 wsio-core = { path = "../wsio-core", version = "0.7.0" }
 
+# Features
 [features]
-default = []
-
+## Define features
 packet-codec-bincode = ["wsio-core/packet-codec-bincode"]
 packet-codec-cbor = ["wsio-core/packet-codec-cbor"]
 packet-codec-msgpack = ["wsio-core/packet-codec-msgpack"]
 packet-codec-postcard = ["wsio-core/packet-codec-postcard"]
 packet-codec-sonic-rs = ["wsio-core/packet-codec-sonic-rs"]
 
+## Default and alias
+default = []
 all = [
   "packet-codec-bincode",
   "packet-codec-cbor",
   "packet-codec-msgpack",
   "packet-codec-postcard",
-  "packet-codec-sonic-rs"
+  "packet-codec-sonic-rs",
 ]
 
 full = ["all"]
