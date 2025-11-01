@@ -179,7 +179,7 @@ impl WsIoServerNamespace {
     #[inline]
     pub(crate) fn add_connection_id_to_room(&self, room_name: &str, connection_id: u64) {
         self.rooms
-            .entry(room_name.to_string())
+            .entry(room_name.into())
             .or_default()
             .clone()
             .insert(connection_id);

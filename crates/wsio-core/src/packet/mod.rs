@@ -55,7 +55,7 @@ impl WsIoPacket {
     pub fn new(r#type: WsIoPacketType, key: Option<&str>, data: Option<Vec<u8>>) -> Self {
         Self {
             data,
-            key: key.map(|k| k.to_string()),
+            key: key.map(|k| k.into()),
             r#type,
         }
     }

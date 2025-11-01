@@ -125,7 +125,7 @@ impl<C: Send + Sync + 'static, S: TaskSpawner> WsIoEventRegistry<C, S> {
         let data_type_id = TypeId::of::<D>();
 
         let mut event_entries = self.event_entries.write();
-        let event_entry = match event_entries.entry(event.to_string()) {
+        let event_entry = match event_entries.entry(event.into()) {
             Entry::Occupied(occupied) => {
                 let event_entry = occupied.into_mut();
                 assert_eq!(

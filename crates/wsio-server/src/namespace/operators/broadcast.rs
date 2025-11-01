@@ -121,7 +121,7 @@ impl WsIoServerNamespaceBroadcastOperator {
     #[inline]
     pub fn except<I: IntoIterator<Item = S>, S: AsRef<str>>(mut self, room_names: I) -> Self {
         self.exclude_rooms
-            .extend(room_names.into_iter().map(|room_name| room_name.as_ref().to_string()));
+            .extend(room_names.into_iter().map(|room_name| room_name.as_ref().into()));
 
         self
     }
@@ -134,7 +134,7 @@ impl WsIoServerNamespaceBroadcastOperator {
     #[inline]
     pub fn to<I: IntoIterator<Item = S>, S: AsRef<str>>(mut self, room_names: I) -> Self {
         self.include_rooms
-            .extend(room_names.into_iter().map(|room_name| room_name.as_ref().to_string()));
+            .extend(room_names.into_iter().map(|room_name| room_name.as_ref().into()));
 
         self
     }

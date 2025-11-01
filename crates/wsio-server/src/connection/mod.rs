@@ -377,7 +377,7 @@ impl WsIoServerConnection {
         for room_name in room_names {
             let room_name = room_name.as_ref();
             self.namespace.add_connection_id_to_room(room_name, self.id);
-            self.joined_rooms.insert(room_name.to_string());
+            self.joined_rooms.insert(room_name.into());
         }
     }
 
